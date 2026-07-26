@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-version:
+    name: Verify versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check project and tag versions
+        run: node scripts/check-versions.mjs --tag "${{ github.ref_name }}"
+
+  release:
+    name: Build (${{ matrix.platform }})
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: >-
+              --target universal-apple-darwin
+              --config .release/tauri.release.conf.json
+              --bundles app,dmg
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - platform: windows-latest
+            args: >-
+              --target x86_64-pc-windows-msvc
+              --config .release/tauri.release.conf.json
+              --bundles nsis
+            rust_targets: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate release config
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node scripts/generate-release-config.mjs
+
+      - name: Build and publish release assets
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: OpenNote ${{ github.ref_name }}
+          releaseBody: |
+            See the attached installers and updater artifacts for this release.
+
+            Auto-update clients fetch `latest.json` from `/releases/latest/download/latest.json`.
+          releaseDraft: false
+          prerelease: false
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
+          retryAttempts: 2
+          args: ${{ matrix.args }}
