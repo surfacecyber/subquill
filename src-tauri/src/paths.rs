@@ -183,13 +183,23 @@ fn set_private_file_permissions(path: &Path) -> Result<()> {
 }
 
 fn sync_parent_dir(path: &Path) -> Result<()> {
-    let Some(parent) = path.parent() else {
-        return Ok(());
-    };
+    // Directory fsync is a Unix durability aid. On Windows, opening a directory
+    // handle and calling sync_all fails (ERROR_ACCESS_DENIED / not supported).
+    #[cfg(unix)]
+    {
+        let Some(parent) = path.parent() else {
+            return Ok(());
+        };
 
-    if !parent.as_os_str().is_empty() {
-        let dir = std::fs::File::open(parent)?;
-        dir.sync_all()?;
+        if !parent.as_os_str().is_empty() {
+            let dir = std::fs::File::open(parent)?;
+            dir.sync_all()?;
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = path;
     }
 
     Ok(())
