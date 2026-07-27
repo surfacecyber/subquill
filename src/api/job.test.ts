@@ -68,17 +68,17 @@ describe("job command wrappers", () => {
   });
 
   it("testLlm invokes test_llm with input", async () => {
-    vi.mocked(invoke).mockResolvedValueOnce({ ok: true, model: "gpt-4o-mini" });
+    vi.mocked(invoke).mockResolvedValueOnce({ ok: true, model: "deepseek-v4-flash" });
 
     await testLlm({
       base_url: "https://api.openai.com/v1",
-      model: "gpt-4o-mini",
+      model: "deepseek-v4-flash",
       api_key: "sk-test",
     });
     expect(invoke).toHaveBeenCalledWith("test_llm", {
       input: {
         base_url: "https://api.openai.com/v1",
-        model: "gpt-4o-mini",
+        model: "deepseek-v4-flash",
         api_key: "sk-test",
       },
     });

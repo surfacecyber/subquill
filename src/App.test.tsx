@@ -28,7 +28,7 @@ import { listenJobProgress } from "./api/job";
 const completedSettings = {
   version: 1,
   base_url: "https://api.openai.com/v1",
-  model: "gpt-4o-mini",
+  model: "deepseek-v4-flash",
   locale: "en" as const,
   onboarding_completed: true,
 };

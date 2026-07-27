@@ -196,7 +196,7 @@ export function ConfigForm({
             markConnectionDirty();
             setModel(event.target.value);
           }}
-          placeholder="gpt-4o-mini"
+          placeholder="deepseek-v4-flash"
           required
           autoComplete="off"
         />
