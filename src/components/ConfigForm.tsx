@@ -53,9 +53,22 @@ export function ConfigForm({
     setErrorDetail(localized.detail ?? null);
   }
 
+  /** Clear stale “saved / tested” feedback once the form is dirty again. */
+  function markDirty() {
+    setSuccess(false);
+    setCookieMessage(null);
+  }
+
+  function markConnectionDirty() {
+    markDirty();
+    setTestSuccess(null);
+  }
+
   async function handleTestConnection() {
     setTesting(true);
     setTestSuccess(null);
+    setSuccess(false);
+    setCookieMessage(null);
     setError(null);
     setErrorDetail(null);
 
@@ -75,6 +88,7 @@ export function ConfigForm({
 
   async function handleClearCookie() {
     setCookieMessage(null);
+    setSuccess(false);
     setError(null);
     setErrorDetail(null);
 
@@ -163,7 +177,10 @@ export function ConfigForm({
         <input
           type="url"
           value={baseUrl}
-          onChange={(event) => setBaseUrl(event.target.value)}
+          onChange={(event) => {
+            markConnectionDirty();
+            setBaseUrl(event.target.value);
+          }}
           placeholder="https://api.openai.com/v1"
           required
           autoComplete="off"
@@ -175,7 +192,10 @@ export function ConfigForm({
         <input
           type="text"
           value={model}
-          onChange={(event) => setModel(event.target.value)}
+          onChange={(event) => {
+            markConnectionDirty();
+            setModel(event.target.value);
+          }}
           placeholder="gpt-4o-mini"
           required
           autoComplete="off"
@@ -187,7 +207,10 @@ export function ConfigForm({
         <input
           type="password"
           value={apiKey}
-          onChange={(event) => setApiKey(event.target.value)}
+          onChange={(event) => {
+            markConnectionDirty();
+            setApiKey(event.target.value);
+          }}
           placeholder={
             authStatus?.has_api_key ? t(locale, "apiKeySaved") : ""
           }
@@ -200,7 +223,10 @@ export function ConfigForm({
         <input
           type="password"
           value={bilibiliCookie}
-          onChange={(event) => setBilibiliCookie(event.target.value)}
+          onChange={(event) => {
+            markDirty();
+            setBilibiliCookie(event.target.value);
+          }}
           placeholder={
             authStatus?.has_bilibili_cookie
               ? t(locale, "bilibiliCookieSaved")
@@ -227,7 +253,10 @@ export function ConfigForm({
         <span>{t(locale, "locale")}</span>
         <select
           value={settingsLocale}
-          onChange={(event) => setSettingsLocale(event.target.value as Locale)}
+          onChange={(event) => {
+            markDirty();
+            setSettingsLocale(event.target.value as Locale);
+          }}
         >
           <option value="system">{t(locale, "localeSystem")}</option>
           <option value="zh">{t(locale, "localeZh")}</option>
