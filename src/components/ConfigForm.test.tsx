@@ -20,7 +20,7 @@ import { testLlm } from "../api/job";
 const baseSettings = {
   version: 1,
   base_url: "https://api.openai.com/v1",
-  model: "gpt-4o-mini",
+  model: "deepseek-v4-flash",
   locale: "en" as const,
   onboarding_completed: false,
 };
@@ -52,7 +52,7 @@ describe("ConfigForm", () => {
   });
 
   it("shows test connection success", async () => {
-    vi.mocked(testLlm).mockResolvedValue({ ok: true, model: "gpt-4o-mini" });
+    vi.mocked(testLlm).mockResolvedValue({ ok: true, model: "deepseek-v4-flash" });
 
     const user = userEvent.setup();
     render(
@@ -72,13 +72,13 @@ describe("ConfigForm", () => {
 
     expect(testLlm).toHaveBeenCalledWith({
       base_url: "https://api.openai.com/v1",
-      model: "gpt-4o-mini",
+      model: "deepseek-v4-flash",
       api_key: undefined,
     });
   });
 
   it("tests connection with unsaved onboarding form values", async () => {
-    vi.mocked(testLlm).mockResolvedValue({ ok: true, model: "gpt-4o-mini" });
+    vi.mocked(testLlm).mockResolvedValue({ ok: true, model: "deepseek-v4-flash" });
 
     const user = userEvent.setup();
     render(

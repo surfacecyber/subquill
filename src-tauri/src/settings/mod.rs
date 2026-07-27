@@ -39,7 +39,7 @@ impl Default for Settings {
         Self {
             version: SETTINGS_VERSION,
             base_url: "https://api.openai.com/v1".to_string(),
-            model: "gpt-4o-mini".to_string(),
+            model: "deepseek-v4-flash".to_string(),
             locale: Locale::System,
             onboarding_completed: false,
         }

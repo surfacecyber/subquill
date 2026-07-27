@@ -401,7 +401,7 @@ mod test_llm_tests {
     fn test_llm_input_debug_redacts_api_key() {
         let input = TestLlmInput {
             base_url: "https://api.example.com/v1".to_string(),
-            model: "gpt-4o-mini".to_string(),
+            model: "deepseek-v4-flash".to_string(),
             api_key: Some("sk-secret".to_string()),
         };
         let debug = format!("{input:?}");
@@ -418,7 +418,7 @@ mod test_llm_tests {
             &paths,
             &TestLlmInput {
                 base_url: "https://api.example.com/v1".to_string(),
-                model: "gpt-4o-mini".to_string(),
+                model: "deepseek-v4-flash".to_string(),
                 api_key: Some("sk-from-form".to_string()),
             },
         )
@@ -446,7 +446,7 @@ mod test_llm_tests {
             &paths,
             &TestLlmInput {
                 base_url: "https://api.example.com/v1".to_string(),
-                model: "gpt-4o-mini".to_string(),
+                model: "deepseek-v4-flash".to_string(),
                 api_key: None,
             },
         )
@@ -464,7 +464,7 @@ mod test_llm_tests {
             &paths,
             &TestLlmInput {
                 base_url: "https://api.example.com/v1".to_string(),
-                model: "gpt-4o-mini".to_string(),
+                model: "deepseek-v4-flash".to_string(),
                 api_key: None,
             },
         )
