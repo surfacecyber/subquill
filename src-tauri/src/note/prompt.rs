@@ -38,7 +38,7 @@ pub fn chunk_user_prompt(
             if let Some(part) = &metadata.part_title {
                 lines.push(format!("分 P 标题：{}", part));
             }
-            lines.push(format!("BV 号：{}", metadata.bvid));
+            lines.push(format!("视频 ID：{}", metadata.bvid));
             lines.push(format!(
                 "本块时间范围：{} - {}（毫秒 {}-{}）",
                 format_timestamp(chunk.start_ms),
@@ -53,7 +53,7 @@ pub fn chunk_user_prompt(
             if let Some(part) = &metadata.part_title {
                 lines.push(format!("Part title: {}", part));
             }
-            lines.push(format!("BV id: {}", metadata.bvid));
+            lines.push(format!("Video id: {}", metadata.bvid));
             lines.push(format!(
                 "Chunk range: {} - {} (ms {}-{})",
                 format_timestamp(chunk.start_ms),

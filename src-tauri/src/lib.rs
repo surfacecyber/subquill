@@ -4,10 +4,12 @@ mod commands;
 mod error;
 pub mod job;
 pub mod llm;
+mod media;
 mod note;
 mod paths;
 mod redact;
 mod settings;
+mod youtube;
 
 pub use note::{
     generate_note_data, render_markdown, NoteData, NoteLocale, NoteProgress, NoteProgressStage,

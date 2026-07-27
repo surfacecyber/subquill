@@ -1,6 +1,6 @@
 # OpenNote
 
-Desktop app for generating study notes from Bilibili videos.
+Desktop app for generating study notes from Bilibili / YouTube videos.
 
 - **Stack**: Tauri 2, React, TypeScript, Vite, Rust
 - **Platform**: macOS + Windows
@@ -20,7 +20,7 @@ The dev server runs on port 1420. The Tauri window opens at about 960×700.
 - First-run onboarding: base URL, model, API Key, locale, optional Bilibili cookie
 - Credentials are stored on disk only; the UI shows “configured” placeholders and never echoes secrets
 - Test LLM connection from onboarding and settings
-- Main workspace: paste a Bilibili URL, generate notes, track progress, cancel in-flight jobs
+- Main workspace: paste a Bilibili or YouTube URL, generate notes, track progress, cancel in-flight jobs
 - Safe Markdown preview (no raw HTML), copy to clipboard, export to `.md` via native save dialog
 - Settings: update configuration, test connection, explicitly clear saved Bilibili cookie
 - About: app name, version, manual update checks with live status

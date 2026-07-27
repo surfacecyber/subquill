@@ -124,6 +124,7 @@ describe("ConfigForm", () => {
     expect(
       screen.getByText(/Bilibili cookie \(optional, SESSDATA only\)/),
     ).toBeInTheDocument();
+    expect(screen.getByText(/Used to fetch Bilibili AI/i)).toBeInTheDocument();
     expect(screen.getByText(/copy the SESSDATA value/i)).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("SESSDATA=… or paste value"),

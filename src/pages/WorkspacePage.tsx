@@ -104,10 +104,10 @@ export function WorkspacePage({ locale }: WorkspacePageProps) {
       </header>
 
       <div className="workspace-input">
-        <label className="url-label" htmlFor="bilibili-url">
+        <label className="url-label" htmlFor="video-url">
           <span>{t(locale, "bilibiliUrl")}</span>
           <input
-            id="bilibili-url"
+            id="video-url"
             type="url"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
