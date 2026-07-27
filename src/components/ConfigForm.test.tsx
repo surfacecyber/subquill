@@ -131,6 +131,41 @@ describe("ConfigForm", () => {
     ).toBeInTheDocument();
   });
 
+  it("clears saved feedback when the form is edited again", async () => {
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveAuth).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveSettings).mockResolvedValue({
+      ...baseSettings,
+      onboarding_completed: true,
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ConfigForm
+        mode="settings"
+        locale="en"
+        initialSettings={{ ...baseSettings, onboarding_completed: true }}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(screen.getByText("Settings saved")).toBeInTheDocument();
+    });
+
+    await user.clear(screen.getByLabelText("Model"));
+    await user.type(screen.getByLabelText("Model"), "gpt-4o");
+
+    expect(screen.queryByText("Settings saved")).not.toBeInTheDocument();
+  });
+
   it("does not pretend full success when settings save fails after auth", async () => {
     vi.mocked(getAuthStatus).mockResolvedValue({
       has_api_key: true,
