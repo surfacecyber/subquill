@@ -15,7 +15,9 @@
         "title": "OpenNote",
         "width": 960,
         "height": 700,
-        "resizable": true
+        "resizable": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay"
       }
     ],
     "security": {

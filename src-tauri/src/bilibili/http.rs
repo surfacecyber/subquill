@@ -5,7 +5,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, REFERER, USER_
 
 use super::bounded::{check_content_length, read_bounded_body};
 use super::error::{BilibiliError, Result};
-use super::url::is_api_host;
+use super::url::{is_api_host, is_subtitle_cdn_host};
 
 pub const USER_AGENT_VALUE: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 pub const BILIBILI_REFERER: &str = "https://www.bilibili.com";
@@ -139,9 +139,21 @@ impl ReqwestTransport {
 
         Ok(Self {
             client,
-            cookie: cookie.filter(|value| !value.trim().is_empty()),
+            cookie: cookie.and_then(|value| normalize_cookie_header(&value)),
         })
     }
+}
+
+/// Accept either `SESSDATA=…` / full cookie header, or a raw SESSDATA value.
+fn normalize_cookie_header(raw: &str) -> Option<String> {
+    let trimmed = raw.trim().trim_matches('"');
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.to_ascii_lowercase().contains("sessdata=") {
+        return Some(trimmed.to_string());
+    }
+    Some(format!("SESSDATA={trimmed}"))
 }
 
 fn read_bounded_response_body(
@@ -162,6 +174,16 @@ impl HttpTransport for ReqwestTransport {
 
         let headers = if is_api_host(host) {
             build_api_headers(self.cookie.as_deref(), request.send_cookie)?
+        } else if is_subtitle_cdn_host(host) {
+            // Align with BiliNote: always send Referer when fetching subtitle JSON.
+            let mut headers = HeaderMap::new();
+            headers.insert(USER_AGENT, HeaderValue::from_static(USER_AGENT_VALUE));
+            headers.insert(REFERER, HeaderValue::from_static(BILIBILI_REFERER));
+            headers.insert(
+                ACCEPT,
+                HeaderValue::from_static("application/json, text/plain, */*"),
+            );
+            headers
         } else {
             let mut headers = HeaderMap::new();
             headers.insert(USER_AGENT, HeaderValue::from_static(USER_AGENT_VALUE));
@@ -243,7 +265,7 @@ pub mod mock {
     use super::*;
     use crate::bilibili::bounded::{body_limit_exceeded, check_content_length};
     use reqwest::StatusCode;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, VecDeque};
     use std::sync::{Arc, Mutex};
 
     #[derive(Debug, Clone)]
@@ -286,16 +308,24 @@ pub mod mock {
 
     #[derive(Debug)]
     pub struct MockTransport {
-        responses: HashMap<String, MockResponse>,
+        responses: HashMap<String, Arc<Mutex<VecDeque<MockResponse>>>>,
         requests: Arc<Mutex<Vec<HttpRequest>>>,
     }
 
     impl MockTransport {
         pub fn new(entries: Vec<(&str, MockResponse)>) -> Self {
+            let mut responses: HashMap<String, VecDeque<MockResponse>> = HashMap::new();
+            for (url, response) in entries {
+                responses
+                    .entry(url.to_string())
+                    .or_default()
+                    .push_back(response);
+            }
+
             Self {
-                responses: entries
+                responses: responses
                     .into_iter()
-                    .map(|(url, response)| (url.to_string(), response))
+                    .map(|(url, queue)| (url, Arc::new(Mutex::new(queue))))
                     .collect(),
                 requests: Arc::new(Mutex::new(Vec::new())),
             }
@@ -313,7 +343,16 @@ pub mod mock {
                 .expect("lock requests")
                 .push(request.clone());
 
-            let response = self.responses.get(&request.url).cloned().ok_or_else(|| {
+            let queue = self.responses.get(&request.url).ok_or_else(|| {
+                BilibiliError::network(format!("no mock response for {}", request.url))
+            })?;
+            let mut queue = queue.lock().expect("lock mock queue");
+            let response = if queue.len() <= 1 {
+                queue.front().cloned()
+            } else {
+                queue.pop_front()
+            }
+            .ok_or_else(|| {
                 BilibiliError::network(format!("no mock response for {}", request.url))
             })?;
 

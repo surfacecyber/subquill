@@ -60,7 +60,7 @@ mod integration_tests {
             ),
             (
                 "https://subtitle.bilibili.com/zh.json",
-                MockResponse::success(r#"{"body":[{"from":0.5,"to":1.5,"content":"测试"}]}"#),
+                MockResponse::success(r#"{"body":[{"from":0.5,"to":1.5,"content":"测试"},{"from":1.5,"to":2.5,"content":"内容"},{"from":2.5,"to":3.5,"content":"完整"}]}"#),
             ),
         ]);
 

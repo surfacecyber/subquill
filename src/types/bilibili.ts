@@ -12,6 +12,7 @@ export interface BilibiliSubtitleResult {
   cid: number;
   p: number;
   page_count: number;
+  duration_ms?: number;
   language: string;
   segments: SubtitleSegment[];
 }

@@ -111,6 +111,25 @@ describe("ConfigForm", () => {
     expect(saveAuth).not.toHaveBeenCalled();
   });
 
+  it("shows SESSDATA cookie guidance", () => {
+    render(
+      <ConfigForm
+        mode="settings"
+        locale="en"
+        initialSettings={{ ...baseSettings, onboarding_completed: true }}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(/Bilibili cookie \(optional, SESSDATA only\)/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/copy the SESSDATA value/i)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("SESSDATA=… or paste value"),
+    ).toBeInTheDocument();
+  });
+
   it("does not pretend full success when settings save fails after auth", async () => {
     vi.mocked(getAuthStatus).mockResolvedValue({
       has_api_key: true,

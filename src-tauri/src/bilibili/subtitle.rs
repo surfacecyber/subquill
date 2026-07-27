@@ -70,6 +70,59 @@ pub fn fetch_subtitle_segments(
     parse_subtitle_body(&payload.body)
 }
 
+/// Reject AI/CC payloads that clearly do not belong to the target video duration,
+/// or that contain almost no usable speech (e.g. only music placeholders).
+pub fn validate_subtitle_coverage(
+    segments: &[SubtitleSegment],
+    video_duration_secs: u64,
+) -> Result<()> {
+    if segments.is_empty() {
+        return Err(BilibiliError::subtitle_corrupt(
+            "subtitle payload contained no valid segments",
+        ));
+    }
+
+    let speech_segments: Vec<&SubtitleSegment> = segments
+        .iter()
+        .filter(|segment| !is_non_speech_placeholder(&segment.text))
+        .collect();
+
+    if speech_segments.len() < 3 {
+        return Err(BilibiliError::subtitle_corrupt(
+            "subtitle payload has too little usable speech content",
+        ));
+    }
+
+    if video_duration_secs == 0 {
+        return Ok(());
+    }
+
+    let video_duration_ms = video_duration_secs.saturating_mul(1000);
+    let subtitle_end_ms = segments
+        .iter()
+        .map(|segment| segment.end_ms)
+        .max()
+        .unwrap_or(0);
+
+    // Wrong-video AI payloads often overrun the real duration substantially.
+    if subtitle_end_ms > video_duration_ms.saturating_mul(5).saturating_div(4) {
+        return Err(BilibiliError::subtitle_corrupt(
+            "subtitle timeline exceeds video duration; AI subtitle may belong to another video",
+        ));
+    }
+
+    // Incomplete AI captions (e.g. only opening music) cover far too little of longer videos.
+    if video_duration_secs >= 120
+        && subtitle_end_ms < video_duration_ms.saturating_mul(2).saturating_div(5)
+    {
+        return Err(BilibiliError::subtitle_corrupt(
+            "subtitle timeline covers too little of the video duration",
+        ));
+    }
+
+    Ok(())
+}
+
 pub fn parse_subtitle_body(items: &[SubtitleBodyItem]) -> Result<Vec<SubtitleSegment>> {
     let mut segments = Vec::new();
 
@@ -103,19 +156,36 @@ pub fn parse_subtitle_body(items: &[SubtitleBodyItem]) -> Result<Vec<SubtitleSeg
 
 fn is_chinese(track: &SubtitleTrack) -> bool {
     let lan = track.lan.to_ascii_lowercase();
-    lan.starts_with("zh") || lan == "ai-zh"
+    lan.starts_with("zh") || lan == "ai-zh" || lan.starts_with("ai-zh")
 }
 
 fn is_manual(track: &SubtitleTrack) -> bool {
-    track.ai_type == 0
+    !is_ai(track)
 }
 
 fn is_ai(track: &SubtitleTrack) -> bool {
-    track.ai_type != 0
+    track.ai_type != 0 || track.lan.to_ascii_lowercase().starts_with("ai-")
 }
 
 fn has_subtitle_url(track: &SubtitleTrack) -> bool {
     !track.subtitle_url.trim().is_empty()
+}
+
+fn is_non_speech_placeholder(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+    if trimmed.contains('♪') || trimmed.contains('♫') {
+        return true;
+    }
+    let normalized = trimmed
+        .trim_matches(|c: char| c == '[' || c == ']' || c == '【' || c == '】' || c == '(' || c == ')')
+        .trim();
+    matches!(
+        normalized.to_ascii_lowercase().as_str(),
+        "音乐" | "music" | "bgm" | "applause" | "掌声"
+    )
 }
 
 fn seconds_to_millis(value: f64) -> Result<u64> {
@@ -211,5 +281,69 @@ mod tests {
 
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].text, "valid");
+    }
+
+    #[test]
+    fn select_treats_ai_lan_as_ai_even_when_ai_type_zero() {
+        let tracks = vec![
+            track("ai-zh", 0, "https://example.bilibili.com/ai.json"),
+            track("zh-CN", 0, "https://example.bilibili.com/manual.json"),
+        ];
+        let selected = select_subtitle_track(&tracks).unwrap();
+        assert_eq!(
+            selected.subtitle_url,
+            "https://example.bilibili.com/manual.json"
+        );
+    }
+
+    fn seg(start_ms: u64, end_ms: u64, text: &str) -> SubtitleSegment {
+        SubtitleSegment {
+            start_ms,
+            end_ms,
+            text: text.to_string(),
+        }
+    }
+
+    #[test]
+    fn validate_rejects_music_only_payload() {
+        let segments = vec![
+            seg(0, 1000, "♪ 音乐 ♪"),
+            seg(1000, 2000, "♪ 音乐 ♪"),
+            seg(2000, 3000, "♪ 音乐 ♪"),
+        ];
+        let err = validate_subtitle_coverage(&segments, 1237).unwrap_err();
+        assert_eq!(err.code(), "SUBTITLE_CORRUPT");
+    }
+
+    #[test]
+    fn validate_rejects_timeline_far_beyond_video() {
+        let segments = vec![
+            seg(0, 1000, "a"),
+            seg(1000, 2000, "b"),
+            seg(2000, 1_900_000, "c"),
+        ];
+        let err = validate_subtitle_coverage(&segments, 1237).unwrap_err();
+        assert_eq!(err.code(), "SUBTITLE_CORRUPT");
+    }
+
+    #[test]
+    fn validate_rejects_short_coverage_on_long_video() {
+        let segments = vec![
+            seg(0, 1000, "a"),
+            seg(1000, 2000, "b"),
+            seg(2000, 40_000, "c"),
+        ];
+        let err = validate_subtitle_coverage(&segments, 1237).unwrap_err();
+        assert_eq!(err.code(), "SUBTITLE_CORRUPT");
+    }
+
+    #[test]
+    fn validate_accepts_reasonable_coverage() {
+        let segments = vec![
+            seg(0, 1000, "a"),
+            seg(1000, 2000, "b"),
+            seg(600_000, 700_000, "c"),
+        ];
+        validate_subtitle_coverage(&segments, 1237).unwrap();
     }
 }

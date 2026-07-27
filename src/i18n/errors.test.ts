@@ -15,10 +15,10 @@ describe("error localization", () => {
 
   it("localizes NO_SUBTITLE specifically", () => {
     expect(localizeError("zh", "NO_SUBTITLE").title).toBe(
-      "未检测到可用字幕。部分 AI 字幕可能需要在设置中配置 B 站 Cookie。",
+      "该视频暂无可用的在线字幕（含 AI 字幕）。通常与 Cookie 无关；可换有字幕的视频，或稍后再试。",
     );
     expect(localizeError("en", "NO_SUBTITLE").title).toBe(
-      "No usable subtitles found. Some AI subtitles may require a Bilibili cookie in Settings.",
+      "No online subtitle track is available for this video (including AI captions). This usually isn't a cookie issue; try another video or retry later.",
     );
   });
 

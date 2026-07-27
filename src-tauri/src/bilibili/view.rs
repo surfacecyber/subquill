@@ -151,6 +151,7 @@ fn select_page(pages: &[VideoPage], requested_p: u32, page_count: u32) -> Result
         p: requested_p,
         part_title,
         page_count,
+        duration_secs: page.duration,
     })
 }
 

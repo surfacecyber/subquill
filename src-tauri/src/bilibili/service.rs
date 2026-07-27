@@ -1,7 +1,9 @@
 use super::error::{BilibiliError, Result};
 use super::http::{HttpTransport, ReqwestTransport};
 use super::player::fetch_subtitle_tracks;
-use super::subtitle::{fetch_subtitle_segments, select_subtitle_track};
+use super::subtitle::{
+    fetch_subtitle_segments, select_subtitle_track, validate_subtitle_coverage,
+};
 use super::types::BilibiliSubtitleResult;
 use super::url::{is_short_link_host, parse_video_url, resolve_short_link};
 use super::view::fetch_view;
@@ -18,21 +20,56 @@ pub fn fetch_subtitles_with_transport(
     let resolved_url = resolve_input_url(transport, input_url.trim())?;
     let video_ref = parse_video_url(&resolved_url)?;
     let (view, selected) = fetch_view(transport, &video_ref)?;
-    let tracks = fetch_subtitle_tracks(transport, &view.bvid, selected.cid)?;
+
+    // Bilibili AI subtitle CDN is intermittently wrong/incomplete for the same cid.
+    // Retry a few times before surfacing SUBTITLE_CORRUPT / NO_SUBTITLE.
+    let mut last_error: Option<BilibiliError> = None;
+    for _attempt in 0..3 {
+        match fetch_validated_segments(transport, &view.bvid, selected.cid, selected.duration_secs)
+        {
+            Ok((language, segments)) => {
+                return Ok(BilibiliSubtitleResult {
+                    title: view.title,
+                    part_title: selected.part_title,
+                    bvid: view.bvid,
+                    aid: view.aid,
+                    cid: selected.cid,
+                    p: selected.p,
+                    page_count: selected.page_count,
+                    duration_ms: selected.duration_secs.saturating_mul(1000),
+                    language,
+                    segments,
+                });
+            }
+            Err(err) => {
+                let retryable = matches!(
+                    err.code(),
+                    "SUBTITLE_CORRUPT" | "NO_SUBTITLE" | "NETWORK_ERROR"
+                );
+                last_error = Some(err);
+                if !retryable {
+                    break;
+                }
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        BilibiliError::no_subtitle("failed to fetch usable subtitles")
+    }))
+}
+
+fn fetch_validated_segments(
+    transport: &dyn HttpTransport,
+    bvid: &str,
+    cid: u64,
+    duration_secs: u64,
+) -> Result<(String, Vec<crate::bilibili::types::SubtitleSegment>)> {
+    let tracks = fetch_subtitle_tracks(transport, bvid, cid)?;
     let track = select_subtitle_track(&tracks)?;
     let segments = fetch_subtitle_segments(transport, &track.subtitle_url)?;
-
-    Ok(BilibiliSubtitleResult {
-        title: view.title,
-        part_title: selected.part_title,
-        bvid: view.bvid,
-        aid: view.aid,
-        cid: selected.cid,
-        p: selected.p,
-        page_count: selected.page_count,
-        language: track.lan.clone(),
-        segments,
-    })
+    validate_subtitle_coverage(&segments, duration_secs)?;
+    Ok((track.lan.clone(), segments))
 }
 
 fn resolve_input_url(transport: &dyn HttpTransport, input_url: &str) -> Result<String> {
@@ -71,8 +108,8 @@ mod tests {
                             "aid": 170001,
                             "title": "Main Title",
                             "pages": [
-                                {"cid": 1, "page": 1, "part": "Part 1", "duration": 100},
-                                {"cid": 2, "page": 2, "part": "Part 2", "duration": 200}
+                                {"cid": 1, "page": 1, "part": "Part 1", "duration": 5},
+                                {"cid": 2, "page": 2, "part": "Part 2", "duration": 5}
                             ]
                         }
                     }"#,
@@ -104,7 +141,8 @@ mod tests {
                     r#"{
                         "body": [
                             {"from": 0.0, "to": 1.2, "content": "你好"},
-                            {"from": 1.2, "to": 2.0, "content": "世界"}
+                            {"from": 1.2, "to": 2.0, "content": "世界"},
+                            {"from": 2.0, "to": 3.0, "content": "测试"}
                         ]
                     }"#,
                 ),
@@ -120,8 +158,9 @@ mod tests {
         assert_eq!(result.title, "Main Title");
         assert_eq!(result.part_title.as_deref(), Some("Part 2"));
         assert_eq!(result.language, "zh-CN");
-        assert_eq!(result.segments.len(), 2);
+        assert_eq!(result.segments.len(), 3);
         assert_eq!(result.segments[0].text, "你好");
+        assert_eq!(result.duration_ms, 5000);
 
         let requests = transport.requests();
         let subtitle_request = requests
@@ -224,7 +263,7 @@ mod tests {
             ),
             (
                 "https://subtitle.bilibili.com/demo.json",
-                MockResponse::success(r#"{"body":[{"from":0.0,"to":1.0,"content":"hi"}]}"#),
+                MockResponse::success(r#"{"body":[{"from":0.0,"to":1.0,"content":"hi"},{"from":1.0,"to":2.0,"content":"there"},{"from":2.0,"to":3.0,"content":"friend"}]}"#),
             ),
         ]);
 

@@ -237,12 +237,16 @@ pub fn resolve_note_locale(locale: &SettingsLocale) -> NoteLocale {
 }
 
 fn video_metadata_from_subtitle(result: &BilibiliSubtitleResult) -> VideoMetadata {
-    let duration_ms = result
-        .segments
-        .iter()
-        .map(|segment| segment.end_ms)
-        .max()
-        .unwrap_or(0);
+    let duration_ms = if result.duration_ms > 0 {
+        result.duration_ms
+    } else {
+        result
+            .segments
+            .iter()
+            .map(|segment| segment.end_ms)
+            .max()
+            .unwrap_or(0)
+    };
 
     VideoMetadata {
         title: result.title.clone(),
@@ -333,6 +337,7 @@ mod tests {
             cid: 1,
             p: 1,
             page_count: 1,
+            duration_ms: 0,
             language: "zh-CN".to_string(),
             segments: vec![SubtitleSegment {
                 start_ms: 1000,
