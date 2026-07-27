@@ -17,7 +17,7 @@ const messages = {
     apiKeySaved: "已配置",
     bilibiliCookie: "B 站 Cookie（可选，只需 SESSDATA）",
     bilibiliCookieHint:
-      "在浏览器打开 bilibili.com → F12 → Application/应用 → Cookies → bilibili.com，复制名为 SESSDATA 的值。可只贴值，也可贴 SESSDATA=值。其余 Cookie 不用复制。",
+      "用于拉取 B 站 AI/需登录字幕；YouTube 不需要。在浏览器打开 bilibili.com → F12 → Application/应用 → Cookies → bilibili.com，复制名为 SESSDATA 的值。可只贴值，也可贴 SESSDATA=值。其余 Cookie 不用复制。",
     bilibiliCookiePlaceholder: "SESSDATA=… 或直接粘贴值",
     bilibiliCookieSaved: "已配置",
     locale: "界面语言",
@@ -35,8 +35,9 @@ const messages = {
     testConnectionModel: "模型",
     clearCookie: "清除 Cookie",
     cookieCleared: "Cookie 已清除",
-    bilibiliUrl: "B 站视频链接",
-    bilibiliUrlPlaceholder: "https://www.bilibili.com/video/BV…",
+    bilibiliUrl: "视频链接",
+    bilibiliUrlPlaceholder:
+      "https://www.bilibili.com/video/BV… 或 https://www.youtube.com/watch?v=…",
     generate: "生成笔记",
     generating: "生成中…",
     cancel: "取消",
@@ -54,7 +55,7 @@ const messages = {
     loading: "加载中…",
     loadSettingsFailed: "无法加载设置。",
     aboutTitle: "关于 OpenNote",
-    aboutDescription: "从 B 站视频字幕生成学习笔记的桌面应用。",
+    aboutDescription: "从 B 站 / YouTube 视频字幕生成学习笔记的桌面应用。",
     version: "版本",
     updaterStatus: "自动更新",
     updaterStatusIdle: "尚未检查",
@@ -90,7 +91,7 @@ const messages = {
     error_storage: "本地存储或读写失败。请检查磁盘权限后重试。",
     error_validation: "输入校验失败。请检查格式后重试。",
     error_NETWORK_ERROR: "网络请求失败。请检查连接后重试。",
-    error_bilibili: "B 站字幕或视频信息获取失败。",
+    error_bilibili: "视频字幕或元信息获取失败。",
     error_NO_SUBTITLE:
       "该视频暂无可用的在线字幕（含 AI 字幕）。通常与 Cookie 无关；可换有字幕的视频，或稍后再试。",
     error_SUBTITLE_CORRUPT:
@@ -123,7 +124,7 @@ const messages = {
     apiKeySaved: "Configured",
     bilibiliCookie: "Bilibili cookie (optional, SESSDATA only)",
     bilibiliCookieHint:
-      "On bilibili.com open DevTools → Application → Cookies → bilibili.com, copy the SESSDATA value. Paste either the raw value or SESSDATA=your-value. Other cookies are not needed.",
+      "Used to fetch Bilibili AI / login-gated captions; YouTube does not need it. On bilibili.com open DevTools → Application → Cookies → bilibili.com, copy the SESSDATA value. Paste either the raw value or SESSDATA=your-value. Other cookies are not needed.",
     bilibiliCookiePlaceholder: "SESSDATA=… or paste value",
     bilibiliCookieSaved: "Configured",
     locale: "Language",
@@ -141,8 +142,9 @@ const messages = {
     testConnectionModel: "Model",
     clearCookie: "Clear cookie",
     cookieCleared: "Cookie cleared",
-    bilibiliUrl: "Bilibili video URL",
-    bilibiliUrlPlaceholder: "https://www.bilibili.com/video/BV…",
+    bilibiliUrl: "Video URL",
+    bilibiliUrlPlaceholder:
+      "https://www.bilibili.com/video/BV… or https://www.youtube.com/watch?v=…",
     generate: "Generate notes",
     generating: "Generating…",
     cancel: "Cancel",
@@ -161,7 +163,7 @@ const messages = {
     loadSettingsFailed: "Failed to load settings.",
     aboutTitle: "About OpenNote",
     aboutDescription:
-      "Desktop app that generates study notes from Bilibili video subtitles.",
+      "Desktop app that generates study notes from Bilibili / YouTube video subtitles.",
     version: "Version",
     updaterStatus: "Auto-update",
     updaterStatusIdle: "Not checked yet",
@@ -199,7 +201,7 @@ const messages = {
     error_storage: "Local storage read/write failed. Check disk permissions.",
     error_validation: "Validation failed. Check your input format.",
     error_NETWORK_ERROR: "Network request failed. Check your connection and try again.",
-    error_bilibili: "Failed to fetch Bilibili subtitles or video metadata.",
+    error_bilibili: "Failed to fetch video subtitles or metadata.",
     error_NO_SUBTITLE:
       "No online subtitle track is available for this video (including AI captions). This usually isn't a cookie issue; try another video or retry later.",
     error_SUBTITLE_CORRUPT:

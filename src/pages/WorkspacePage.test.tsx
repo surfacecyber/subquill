@@ -47,7 +47,7 @@ describe("WorkspacePage", () => {
     const user = userEvent.setup();
     render(<WorkspacePage locale="en" />);
 
-    const input = screen.getByLabelText("Bilibili video URL");
+    const input = screen.getByLabelText("Video URL");
     await user.type(input, "https://www.bilibili.com/video/BV1xx");
 
     const generateButton = screen.getByRole("button", { name: "Generate notes" });
@@ -85,7 +85,7 @@ describe("WorkspacePage", () => {
     render(<WorkspacePage locale="en" />);
 
     await user.type(
-      screen.getByLabelText("Bilibili video URL"),
+      screen.getByLabelText("Video URL"),
       "https://www.bilibili.com/video/BV1xx",
     );
     await user.click(screen.getByRole("button", { name: "Generate notes" }));
@@ -114,7 +114,7 @@ describe("WorkspacePage", () => {
     render(<WorkspacePage locale="en" />);
 
     await user.type(
-      screen.getByLabelText("Bilibili video URL"),
+      screen.getByLabelText("Video URL"),
       "https://www.bilibili.com/video/BV1xx",
     );
     await user.click(screen.getByRole("button", { name: "Generate notes" }));
@@ -142,7 +142,7 @@ describe("WorkspacePage", () => {
     render(<WorkspacePage locale="en" />);
 
     await user.type(
-      screen.getByLabelText("Bilibili video URL"),
+      screen.getByLabelText("Video URL"),
       "https://www.bilibili.com/video/BV1xx",
     );
     await user.click(screen.getByRole("button", { name: "Generate notes" }));

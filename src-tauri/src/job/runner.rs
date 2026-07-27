@@ -6,9 +6,10 @@ use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
 use crate::auth::load_auth;
-use crate::bilibili::{fetch_subtitles, BilibiliSubtitleResult};
+use crate::bilibili::BilibiliSubtitleResult;
 use crate::error::ErrorPayload;
 use crate::llm::{HttpTransport, LlmClient, LlmClientConfig, ReqwestTransport};
+use crate::media;
 use crate::note::{
     generate_note_data, render_markdown, NoteLocale, NoteProgress, NoteProgressStage, VideoMetadata,
 };
@@ -35,8 +36,7 @@ pub fn run_note_job(
         return;
     }
 
-    let fetch =
-        |url: &str, cookie: Option<&str>| fetch_subtitles(url, cookie).map_err(ErrorPayload::from);
+    let fetch = |url: &str, cookie: Option<&str>| media::fetch_subtitles(url, cookie);
 
     match run_note_job_inner(
         &paths,

@@ -49,12 +49,12 @@ describe("App view persistence", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Bilibili video URL")).toBeVisible();
+      expect(screen.getByLabelText("Video URL")).toBeVisible();
     });
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
 
-    const urlInput = screen.getByLabelText("Bilibili video URL");
+    const urlInput = screen.getByLabelText("Video URL");
     expect(urlInput).toBeInTheDocument();
     expect(urlInput).not.toBeVisible();
 
