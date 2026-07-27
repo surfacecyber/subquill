@@ -17,6 +17,9 @@ pub struct BilibiliSubtitleResult {
     pub cid: u64,
     pub p: u32,
     pub page_count: u32,
+    /// Video/page duration in milliseconds when known from the view API.
+    #[serde(default)]
+    pub duration_ms: u64,
     pub language: String,
     pub segments: Vec<SubtitleSegment>,
 }
@@ -51,6 +54,8 @@ pub struct SelectedPage {
     pub p: u32,
     pub part_title: Option<String>,
     pub page_count: u32,
+    /// Page duration in seconds from the view API (0 if unknown).
+    pub duration_secs: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

@@ -16,6 +16,7 @@
   --color-success: #1a6b45;
   --radius: 10px;
   --focus-ring: 2px solid var(--color-focus-ring);
+  --titlebar-inset: 36px;
   line-height: 1.55;
   font-family: var(--font-body);
   font-weight: 400;
@@ -57,36 +58,57 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
+}
+
+html {
+  height: 100%;
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100%;
+  overflow: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+  padding-top: calc(24px + var(--titlebar-inset));
 }
 
 .onboarding-shell {
   align-items: flex-start;
-  padding-top: 48px;
+  padding-top: calc(48px + var(--titlebar-inset));
 }
 
 .app-layout {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(140px, 200px) 1fr;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
+}
+
+.titlebar-drag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-inset);
+  z-index: 20;
 }
 
 .app-nav {
-  padding: 24px 16px;
+  padding: calc(24px + var(--titlebar-inset)) 16px 24px;
   border-right: 1px solid var(--color-border);
   background: var(--color-surface);
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .nav-brand {
@@ -135,8 +157,10 @@ body {
 }
 
 .app-main {
-  padding: 28px 32px;
+  padding: calc(28px + var(--titlebar-inset)) 32px 28px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .view-panel[hidden] {
@@ -421,7 +445,7 @@ body {
   }
 
   .app-main {
-    padding: 20px 16px;
+    padding: calc(20px + var(--titlebar-inset)) 16px 20px;
   }
 }
 

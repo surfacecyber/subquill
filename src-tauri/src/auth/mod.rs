@@ -74,6 +74,20 @@ pub fn normalize_optional_secret(value: Option<String>) -> Option<String> {
     })
 }
 
+/// Accept either `SESSDATA=…` or a raw SESSDATA value pasted from DevTools.
+pub fn normalize_bilibili_cookie(raw: &str) -> String {
+    let trimmed = raw.trim().trim_matches('"');
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    if trimmed.to_ascii_lowercase().contains("sessdata=") {
+        return trimmed.to_string();
+    }
+
+    format!("SESSDATA={trimmed}")
+}
+
 pub fn resolve_bilibili_cookie(
     input: &SaveAuthInput,
     existing: Option<String>,
@@ -88,10 +102,14 @@ pub fn resolve_bilibili_cookie(
     }
 
     if let Some(cookie) = normalize_optional_secret(input.bilibili_cookie.clone()) {
-        return Ok(Some(cookie));
+        let normalized = normalize_bilibili_cookie(&cookie);
+        if normalized.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(normalized));
     }
 
-    Ok(existing)
+    Ok(existing.map(|cookie| normalize_bilibili_cookie(&cookie)).filter(|c| !c.is_empty()))
 }
 
 pub fn load_auth(paths: &StoragePaths) -> Result<Option<AuthSecrets>> {
@@ -275,6 +293,22 @@ mod tests {
 
         let err = resolve_bilibili_cookie(&input, None).unwrap_err();
         assert_eq!(err.code(), "VALIDATION_ERROR");
+    }
+
+    #[test]
+    fn normalize_bilibili_cookie_prefixes_raw_sessdata_value() {
+        assert_eq!(
+            normalize_bilibili_cookie("abc%2Cdef"),
+            "SESSDATA=abc%2Cdef"
+        );
+        assert_eq!(
+            normalize_bilibili_cookie("SESSDATA=abc%2Cdef"),
+            "SESSDATA=abc%2Cdef"
+        );
+        assert_eq!(
+            normalize_bilibili_cookie("sessdata=abc; bili_jct=1"),
+            "sessdata=abc; bili_jct=1"
+        );
     }
 
     #[test]

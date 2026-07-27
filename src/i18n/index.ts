@@ -15,7 +15,10 @@ const messages = {
     model: "模型",
     apiKey: "API Key",
     apiKeySaved: "已配置",
-    bilibiliCookie: "B 站 Cookie（可选）",
+    bilibiliCookie: "B 站 Cookie（可选，只需 SESSDATA）",
+    bilibiliCookieHint:
+      "在浏览器打开 bilibili.com → F12 → Application/应用 → Cookies → bilibili.com，复制名为 SESSDATA 的值。可只贴值，也可贴 SESSDATA=值。其余 Cookie 不用复制。",
+    bilibiliCookiePlaceholder: "SESSDATA=… 或直接粘贴值",
     bilibiliCookieSaved: "已配置",
     locale: "界面语言",
     localeZh: "中文",
@@ -89,9 +92,11 @@ const messages = {
     error_NETWORK_ERROR: "网络请求失败。请检查连接后重试。",
     error_bilibili: "B 站字幕或视频信息获取失败。",
     error_NO_SUBTITLE:
-      "未检测到可用字幕。部分 AI 字幕可能需要在设置中配置 B 站 Cookie。",
+      "该视频暂无可用的在线字幕（含 AI 字幕）。通常与 Cookie 无关；可换有字幕的视频，或稍后再试。",
+    error_SUBTITLE_CORRUPT:
+      "拉取到的字幕与视频时长明显不匹配（可能是 B 站 AI 字幕串台或未生成完整）。请稍后重试，或换有人工字幕的视频。",
     error_VIDEO_NOT_FOUND: "未找到该视频。",
-    error_AUTH_REQUIRED: "需要登录 B 站 Cookie 才能获取字幕。",
+    error_AUTH_REQUIRED: "需要配置 B 站 SESSDATA Cookie 才能获取字幕。",
     error_RATE_LIMITED: "B 站请求过于频繁，请稍后再试。",
     error_PART_OUT_OF_RANGE: "分 P 编号超出视频页数。",
     error_llm: "模型接口调用失败。请检查 Base URL、模型与 API Key。",
@@ -116,7 +121,10 @@ const messages = {
     model: "Model",
     apiKey: "API Key",
     apiKeySaved: "Configured",
-    bilibiliCookie: "Bilibili cookie (optional)",
+    bilibiliCookie: "Bilibili cookie (optional, SESSDATA only)",
+    bilibiliCookieHint:
+      "On bilibili.com open DevTools → Application → Cookies → bilibili.com, copy the SESSDATA value. Paste either the raw value or SESSDATA=your-value. Other cookies are not needed.",
+    bilibiliCookiePlaceholder: "SESSDATA=… or paste value",
     bilibiliCookieSaved: "Configured",
     locale: "Language",
     localeZh: "中文",
@@ -193,9 +201,11 @@ const messages = {
     error_NETWORK_ERROR: "Network request failed. Check your connection and try again.",
     error_bilibili: "Failed to fetch Bilibili subtitles or video metadata.",
     error_NO_SUBTITLE:
-      "No usable subtitles found. Some AI subtitles may require a Bilibili cookie in Settings.",
+      "No online subtitle track is available for this video (including AI captions). This usually isn't a cookie issue; try another video or retry later.",
+    error_SUBTITLE_CORRUPT:
+      "Fetched subtitles do not match the video duration (Bilibili AI captions may be wrong or incomplete). Retry later, or use a video with human-made captions.",
     error_VIDEO_NOT_FOUND: "Video not found.",
-    error_AUTH_REQUIRED: "A Bilibili login cookie is required to fetch subtitles.",
+    error_AUTH_REQUIRED: "A Bilibili SESSDATA cookie is required to fetch subtitles.",
     error_RATE_LIMITED: "Bilibili rate limit reached. Try again later.",
     error_PART_OUT_OF_RANGE: "The requested part number exceeds the video page count.",
     error_llm: "Model API call failed. Check base URL, model, and API key.",

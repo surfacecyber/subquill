@@ -173,7 +173,7 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 - Parse BV/av URLs and `p` part index in Rust (`url.rs`).
 - Resolve `b23.tv` short links with manual redirects and host allowlist.
 - **Title source**: Bilibili **view API** (`x/web-interface/view`).
-- Subtitles: `x/player/wbi/v2` → pick track (manual zh > AI zh > any zh > first valid) → download JSON from allowlisted CDN.
+- Subtitles: `x/player/wbi/v2` (`bvid`+`cid`, same as BiliNote) → pick track (manual zh > AI zh > any zh > first valid) → download JSON from allowlisted CDN. Do **not** use `/x/player/v2` with `aid` — it can return empty or wrong-video `subtitle_url`.
 - Cookie from `auth` only on `api.bilibili.com` requests.
 - HTTP responses are bounded before read: API/redirect ~2 MiB / 64 KiB, subtitle CDN up to 16 MiB; oversize bodies fail without echoing response content.
 - Tauri command: `fetch_bilibili_subtitles` (thin wrapper in `commands/`).
@@ -181,7 +181,7 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 
 **Known risks / deferred**
 
-- **WBI signing**: v1 calls `/x/player/wbi/v2` without WBI nav/signing (consistent with BiliNote). This works today for many videos; if Bilibili tightens access, add a signing fallback — not in v1 scope.
+- **Player API**: v1 calls `/x/player/wbi/v2` with `bvid`+`cid` (aligned with BiliNote). Avoid `/x/player/v2?aid=…` which may return empty or mismatched AI subtitle URLs. Empty lists / empty URLs are retried once.
 - Rate limits / ToS: see release checklist.
 
 ## LLM integration (`llm/`)

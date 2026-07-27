@@ -204,10 +204,11 @@ export function ConfigForm({
           placeholder={
             authStatus?.has_bilibili_cookie
               ? t(locale, "bilibiliCookieSaved")
-              : ""
+              : t(locale, "bilibiliCookiePlaceholder")
           }
           autoComplete="off"
         />
+        <span className="muted-inline">{t(locale, "bilibiliCookieHint")}</span>
       </label>
 
       {mode === "settings" && authStatus?.has_bilibili_cookie ? (

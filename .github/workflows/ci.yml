@@ -1,9 +1,9 @@
+# Auto CI disabled until packaging/release is ready.
+# Re-enable push/pull_request triggers when ready to ship.
 name: CI
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}

@@ -47,6 +47,7 @@ const JOB_CODES = new Set([
 
 const SPECIFIC_ERROR_KEYS: Partial<Record<string, MessageKey>> = {
   NO_SUBTITLE: "error_NO_SUBTITLE",
+  SUBTITLE_CORRUPT: "error_SUBTITLE_CORRUPT",
   VIDEO_NOT_FOUND: "error_VIDEO_NOT_FOUND",
   AUTH_REQUIRED: "error_AUTH_REQUIRED",
   RATE_LIMITED: "error_RATE_LIMITED",

@@ -1,9 +1,9 @@
+# Auto release disabled until packaging is ready.
+# Re-enable tag push triggers (v*) when ready to ship.
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
