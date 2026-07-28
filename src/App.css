@@ -141,7 +141,7 @@ html {
   cursor: pointer;
 }
 
-.nav-link:hover {
+.nav-link:hover:not(.nav-link-active) {
   background: color-mix(in srgb, var(--color-border) 40%, transparent);
 }
 
