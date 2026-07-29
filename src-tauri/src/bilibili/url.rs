@@ -4,7 +4,7 @@ use super::error::{BilibiliError, Result};
 use super::types::ParsedVideoRef;
 use crate::bilibili::http::{HttpRequest, HttpTransport};
 
-pub const VIDEO_PAGE_HOSTS: &[&str] = &["www.bilibili.com", "m.bilibili.com"];
+pub const VIDEO_PAGE_HOSTS: &[&str] = &["www.bilibili.com", "m.bilibili.com", "bilibili.com"];
 pub const SHORT_LINK_HOSTS: &[&str] = &["b23.tv"];
 pub const API_HOST: &str = "api.bilibili.com";
 pub const SUBTITLE_CDN_SUFFIXES: &[&str] = &["hdslb.com", "bilibili.com", "bilivideo.com"];
@@ -302,6 +302,12 @@ mod tests {
         let parsed = parse_video_url("https://www.bilibili.com/video/BV1xx411c7mD/p5").unwrap();
         assert_eq!(parsed.p, Some(5));
         assert!(parsed.p_explicit);
+    }
+
+    #[test]
+    fn parse_apex_bilibili_host() {
+        let parsed = parse_video_url("https://bilibili.com/video/BV1xx411c7mD").unwrap();
+        assert_eq!(parsed.bvid.as_deref(), Some("BV1xx411c7mD"));
     }
 
     #[test]

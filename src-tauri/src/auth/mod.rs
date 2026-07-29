@@ -118,12 +118,15 @@ pub fn load_auth(paths: &StoragePaths) -> Result<Option<AuthSecrets>> {
         return Ok(None);
     };
 
-    let auth: AuthSecrets = serde_json::from_str(&raw)?;
-    if auth.version != AUTH_VERSION {
-        return Err(Error::validation("unsupported auth version"));
+    match serde_json::from_str::<AuthSecrets>(&raw) {
+        Ok(auth) if auth.version == AUTH_VERSION => Ok(Some(auth)),
+        Ok(_) | Err(_) => {
+            // Quarantine corrupt / unsupported auth so save/status can recover.
+            let bak = file.with_extension("json.bak");
+            let _ = std::fs::rename(&file, &bak);
+            Ok(None)
+        }
     }
-
-    Ok(Some(auth))
 }
 
 pub fn save_auth(paths: &StoragePaths, input: SaveAuthInput) -> Result<AuthStatus> {
@@ -329,5 +332,31 @@ mod tests {
         assert!(status.has_api_key);
         assert!(status.has_bilibili_cookie);
         assert_eq!(auth_status(&paths).expect("status"), status);
+    }
+
+    #[test]
+    fn load_auth_recovers_from_corrupt_json() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = StoragePaths::from_dirs(dir.path(), dir.path());
+        let file = paths.auth_file();
+        std::fs::create_dir_all(file.parent().expect("parent")).expect("mkdir");
+        std::fs::write(&file, "{not-json").expect("write corrupt");
+
+        let loaded = load_auth(&paths).expect("load");
+        assert!(loaded.is_none());
+        assert!(!file.exists());
+        assert!(file.with_extension("json.bak").exists());
+
+        // Save can proceed after quarantine.
+        let status = save_auth(
+            &paths,
+            SaveAuthInput {
+                api_key: Some("sk-new".to_string()),
+                bilibili_cookie: None,
+                clear_bilibili_cookie: false,
+            },
+        )
+        .expect("save after quarantine");
+        assert!(status.has_api_key);
     }
 }

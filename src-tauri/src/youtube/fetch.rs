@@ -63,8 +63,8 @@ pub fn fetch_subtitles(input_url: &str) -> Result<YoutubeSubtitleResult> {
             .and_then(|s| s.reason.clone())
             .unwrap_or_else(|| status.to_string());
         if status == "LOGIN_REQUIRED" {
-            return Err(YoutubeError::api_rejected(format!(
-                "YouTube requires login for this video: {reason}"
+            return Err(YoutubeError::video_restricted(format!(
+                "YouTube requires login or restricts this video: {reason}"
             )));
         }
         return Err(YoutubeError::video_not_found(format!(

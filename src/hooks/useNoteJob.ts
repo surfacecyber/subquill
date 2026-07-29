@@ -56,6 +56,8 @@ export function useNoteJob() {
   const jobIdRef = useRef<string | null>(null);
   const pendingEventsRef = useRef<JobProgress[]>([]);
   const isTerminalRef = useRef(false);
+  /** Prevents concurrent start() while listener/claim is in flight. */
+  const startInFlightRef = useRef(false);
 
   const cleanupListener = useCallback(() => {
     if (unlistenRef.current) {
@@ -74,6 +76,7 @@ export function useNoteJob() {
   const handleTerminal = useCallback(
     async (id: string, terminalStatus: JobStatus, terminalError?: AppErrorPayload) => {
       isTerminalRef.current = true;
+      startInFlightRef.current = false;
       stopPolling();
       setIsActive(false);
       setStatus(terminalStatus);
@@ -183,6 +186,7 @@ export function useNoteJob() {
     jobIdRef.current = null;
     pendingEventsRef.current = [];
     isTerminalRef.current = false;
+    startInFlightRef.current = false;
     setJobId(null);
     setStatus(null);
     setProgress(null);
@@ -194,7 +198,14 @@ export function useNoteJob() {
 
   const start = useCallback(
     async (url: string) => {
+      if (startInFlightRef.current || jobIdRef.current !== null) {
+        return;
+      }
+
+      startInFlightRef.current = true;
       reset();
+      startInFlightRef.current = true;
+      setIsActive(true);
 
       const unlisten = await listenJobProgress((event) => {
         const claimedId = jobIdRef.current;
@@ -221,7 +232,9 @@ export function useNoteJob() {
         jobIdRef.current = null;
         pendingEventsRef.current = [];
         isTerminalRef.current = false;
+        startInFlightRef.current = false;
         setIsActive(false);
+        setJobId(null);
         throw err;
       }
     },

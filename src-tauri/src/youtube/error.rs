@@ -9,6 +9,9 @@ pub enum YoutubeError {
     VideoNotFound { message: String },
 
     #[error("{message}")]
+    VideoRestricted { message: String },
+
+    #[error("{message}")]
     ApiRejected { message: String },
 
     #[error("{message}")]
@@ -26,6 +29,7 @@ impl YoutubeError {
         match self {
             Self::InvalidUrl { .. } => "VALIDATION_ERROR",
             Self::VideoNotFound { .. } => "VIDEO_NOT_FOUND",
+            Self::VideoRestricted { .. } => "VIDEO_RESTRICTED",
             Self::ApiRejected { .. } => "API_REJECTED",
             Self::NoSubtitle { .. } => "NO_SUBTITLE",
             Self::SubtitleCorrupt { .. } => "SUBTITLE_CORRUPT",
@@ -41,6 +45,12 @@ impl YoutubeError {
 
     pub fn video_not_found(message: impl Into<String>) -> Self {
         Self::VideoNotFound {
+            message: message.into(),
+        }
+    }
+
+    pub fn video_restricted(message: impl Into<String>) -> Self {
+        Self::VideoRestricted {
             message: message.into(),
         }
     }
