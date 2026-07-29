@@ -107,4 +107,44 @@ describe("useNoteJob listener cleanup", () => {
     expect(result.current.result?.title).toBe("early");
     expect(getJobStatus).not.toHaveBeenCalled();
   });
+
+  it("ignores a second start while the first is still claiming", async () => {
+    const unlisten = vi.fn();
+    let resolveFirstStart!: (value: { job_id: string }) => void;
+    const firstStart = new Promise<{ job_id: string }>((resolve) => {
+      resolveFirstStart = resolve;
+    });
+
+    vi.mocked(listenJobProgress).mockResolvedValue(unlisten);
+    vi.mocked(startNoteJob)
+      .mockImplementationOnce(() => firstStart)
+      .mockResolvedValueOnce({ job_id: "job-2" });
+
+    const { result } = renderHook(() => useNoteJob());
+
+    let first!: Promise<void>;
+    act(() => {
+      first = result.current.start("https://example.com/one");
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.isActive).toBe(true);
+
+    await act(async () => {
+      await result.current.start("https://example.com/two");
+    });
+
+    expect(startNoteJob).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirstStart({ job_id: "job-1" });
+      await first;
+    });
+
+    expect(result.current.jobId).toBe("job-1");
+    expect(startNoteJob).toHaveBeenCalledTimes(1);
+  });
 });

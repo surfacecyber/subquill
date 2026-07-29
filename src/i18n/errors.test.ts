@@ -32,6 +32,15 @@ describe("error localization", () => {
     expect(localizeError("en", "JOB_TIMEOUT").title).toContain("timed out");
   });
 
+  it("localizes YouTube restricted videos distinctly from bilibili auth", () => {
+    const restricted = localizeError("en", "VIDEO_RESTRICTED");
+    expect(restricted.title).toContain("YouTube");
+    expect(restricted.title).not.toContain("SESSDATA");
+
+    const bilibiliAuth = localizeError("en", "AUTH_REQUIRED");
+    expect(bilibiliAuth.title).toContain("Bilibili");
+  });
+
   it("includes detail for unknown errors only", () => {
     const localized = localizeError("en", "UNKNOWN_ERROR", "technical detail");
     expect(localized.detail).toBe("technical detail");

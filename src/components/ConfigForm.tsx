@@ -42,15 +42,32 @@ export function ConfigForm({
   useEffect(() => {
     void getAuthStatus()
       .then(setAuthStatus)
-      .catch(() => {
+      .catch((err) => {
         setAuthStatus({ has_api_key: false, has_bilibili_cookie: false });
+        const payload = err as AppErrorPayload;
+        const localized = localizeError(locale, payload.code, payload.message);
+        setError(t(locale, "errorAuthLoadFailed"));
+        setErrorDetail(localized.detail ?? localized.title);
       });
-  }, []);
+  }, [locale]);
 
   function showError(payload: AppErrorPayload) {
     const localized = localizeError(locale, payload.code, payload.message);
     setError(localized.title);
     setErrorDetail(localized.detail ?? null);
+  }
+
+  function showContextualError(
+    contextKey: "errorAuthSaveFailed" | "errorSettingsSaveFailed",
+    payload: AppErrorPayload,
+  ) {
+    const localized = localizeError(locale, payload.code, payload.message);
+    setError(t(locale, contextKey));
+    setErrorDetail(
+      localized.detail
+        ? `${localized.title} — ${localized.detail}`
+        : localized.title,
+    );
   }
 
   /** Clear stale “saved / tested” feedback once the form is dirty again. */
@@ -129,8 +146,7 @@ export function ConfigForm({
         });
         authSaved = true;
       } catch (err) {
-        showError(err as AppErrorPayload);
-        setError(t(locale, "errorAuthSaveFailed"));
+        showContextualError("errorAuthSaveFailed", err as AppErrorPayload);
         return;
       }
 
@@ -150,9 +166,13 @@ export function ConfigForm({
         setSuccess(true);
         onSettingsSaved(settings);
       } catch (err) {
-        showError(err as AppErrorPayload);
         if (authSaved) {
-          setError(t(locale, "errorSettingsSaveFailed"));
+          showContextualError(
+            "errorSettingsSaveFailed",
+            err as AppErrorPayload,
+          );
+        } else {
+          showError(err as AppErrorPayload);
         }
         return;
       }

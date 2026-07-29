@@ -195,6 +195,7 @@ describe("ConfigForm", () => {
     await waitFor(() => {
       expect(saveAuth).toHaveBeenCalled();
       expect(screen.getByText(/Settings could not be saved/)).toBeInTheDocument();
+      expect(screen.getByText(/Validation failed/)).toBeInTheDocument();
     });
   });
 });
