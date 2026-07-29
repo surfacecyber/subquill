@@ -115,6 +115,10 @@ fn max_tokens_for_chunk(chunk: &SubtitleChunk) -> u32 {
     estimated.clamp(MAX_TOKENS_MIN, MAX_TOKENS_MAX)
 }
 
+fn max_tokens_for_fix(base: u32) -> u32 {
+    base.saturating_mul(2).clamp(MAX_TOKENS_MIN, MAX_TOKENS_MAX)
+}
+
 fn analyze_chunk<T: crate::llm::HttpTransport>(
     client: &LlmClient<T>,
     metadata: &VideoMetadata,
@@ -133,10 +137,11 @@ fn analyze_chunk<T: crate::llm::HttpTransport>(
         Ok(output) => Ok(output),
         Err(first_err) => {
             let reason = first_err.to_string();
+            let fix_max_tokens = max_tokens_for_fix(max_tokens);
             let fix_messages =
                 chunk_fix_messages(metadata, chunk, locale, full_pass, &content, &reason);
             let fixed_content = client
-                .chat(fix_messages, Some(max_tokens))
+                .chat(fix_messages, Some(fix_max_tokens))
                 .map_err(NoteError::Llm)?;
             parse_and_validate_chunk_output(&fixed_content, chunk, video_duration_ms)
                 .map_err(NoteError::Llm)
@@ -274,6 +279,13 @@ mod tests {
             segments: vec![segment(0, 1000, &"x".repeat(80_000))],
         };
         assert_eq!(max_tokens_for_chunk(&large), MAX_TOKENS_MAX);
+    }
+
+    #[test]
+    fn fix_retry_raises_max_tokens() {
+        assert_eq!(max_tokens_for_fix(MAX_TOKENS_MIN), MAX_TOKENS_MIN * 2);
+        assert_eq!(max_tokens_for_fix(MAX_TOKENS_MAX), MAX_TOKENS_MAX);
+        assert_eq!(max_tokens_for_fix(10_000), MAX_TOKENS_MAX);
     }
 
     #[test]

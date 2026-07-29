@@ -114,14 +114,23 @@ describe("useAppUpdater", () => {
   });
 
   it("runs auto-check once on mount and exposes the result to consumers", async () => {
+    const deferred = createDeferred<UpdaterUpdateInfo | null>();
     const runtime: UpdaterRuntime = {
-      checkForUpdate: vi.fn().mockResolvedValue(mockUpdate("1.2.3")),
+      checkForUpdate: vi.fn(() => deferred.promise),
       relaunch: vi.fn(),
     };
 
     const { result } = renderHook(() =>
       useAppUpdater({ autoCheck: true, isDevBuild: false, runtime }),
     );
+
+    await waitFor(() => {
+      expect(result.current.state.phase).toBe("checking");
+    });
+
+    await act(async () => {
+      deferred.resolve(mockUpdate("1.2.3"));
+    });
 
     await waitFor(() => {
       expect(result.current.state.phase).toBe("available");

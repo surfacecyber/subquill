@@ -163,12 +163,15 @@ pub fn load_settings(paths: &StoragePaths) -> Result<Settings> {
         return Ok(Settings::default());
     };
 
-    let settings: Settings = serde_json::from_str(&raw)?;
-    if settings.version != SETTINGS_VERSION {
-        return Err(Error::validation("unsupported settings version"));
+    match serde_json::from_str::<Settings>(&raw) {
+        Ok(settings) if settings.version == SETTINGS_VERSION => Ok(settings),
+        Ok(_) | Err(_) => {
+            // Quarantine corrupt / unsupported settings so the app can start again.
+            let bak = file.with_extension("json.bak");
+            let _ = std::fs::rename(&file, &bak);
+            Ok(Settings::default())
+        }
     }
-
-    Ok(settings)
 }
 
 pub fn save_settings(paths: &StoragePaths, settings: &Settings) -> Result<()> {
@@ -254,5 +257,19 @@ mod tests {
         let loaded = load_settings(&paths).expect("load");
 
         assert_eq!(loaded, settings);
+    }
+
+    #[test]
+    fn load_settings_recovers_from_corrupt_json() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = StoragePaths::from_dirs(dir.path().join("auth"), dir.path());
+        let file = paths.settings_file();
+        std::fs::create_dir_all(file.parent().expect("parent")).expect("mkdir");
+        std::fs::write(&file, "{not-json").expect("write corrupt");
+
+        let loaded = load_settings(&paths).expect("load");
+        assert_eq!(loaded, Settings::default());
+        assert!(!file.exists());
+        assert!(file.with_extension("json.bak").exists());
     }
 }

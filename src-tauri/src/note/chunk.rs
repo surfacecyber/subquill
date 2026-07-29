@@ -3,10 +3,12 @@ use crate::bilibili::SubtitleSegment;
 use super::types::SubtitleChunk;
 
 /// Prefer a single LLM pass when total subtitle prompt lines fit under this limit.
-pub const SINGLE_PASS_CHAR_LIMIT: usize = 80_000;
+/// Sized for CJK-dense transcripts (~1 char ≈ 1 token) plus room for system/output
+/// on common 32k–64k context models.
+pub const SINGLE_PASS_CHAR_LIMIT: usize = 24_000;
 
 /// Per-chunk character budget used only when content exceeds [`SINGLE_PASS_CHAR_LIMIT`].
-pub const LARGE_CHUNK_CHAR_BUDGET: usize = 40_000;
+pub const LARGE_CHUNK_CHAR_BUDGET: usize = 12_000;
 
 /// Plan chunks: single pass under the limit; otherwise split into large chunks.
 pub fn plan_chunks(segments: &[SubtitleSegment]) -> Vec<SubtitleChunk> {
@@ -125,8 +127,8 @@ mod tests {
     #[test]
     fn short_content_stays_single_pass() {
         let segments = vec![
-            segment(0, 1000, &"x".repeat(10_000)),
-            segment(1000, 2000, &"y".repeat(10_000)),
+            segment(0, 1000, &"x".repeat(5_000)),
+            segment(1000, 2000, &"y".repeat(5_000)),
         ];
         let chunks = plan_chunks(&segments);
         assert_eq!(chunks.len(), 1);

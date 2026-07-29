@@ -107,7 +107,7 @@ export function useNoteJob() {
 
       if (isTerminalStage(event.stage)) {
         const terminalError = event.error_code
-          ? { code: event.error_code, message: event.error_code }
+          ? { code: event.error_code, message: "" }
           : undefined;
 
         void handleTerminal(

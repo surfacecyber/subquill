@@ -83,6 +83,9 @@ pub struct ViewApiData {
     pub title: String,
     #[serde(default)]
     pub cid: u64,
+    /// Total duration in seconds when the API omits a pages array.
+    #[serde(default)]
+    pub duration: u64,
     #[serde(default)]
     pub pages: Vec<ViewApiPage>,
 }

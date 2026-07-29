@@ -17,8 +17,14 @@ pub fn merge_chunk_outputs(outputs: &[ChunkLlmOutput]) -> (Vec<NoteSection>, Vec
 fn dedupe_sections(sections: Vec<NoteSection>) -> Vec<NoteSection> {
     let mut deduped = Vec::new();
     for section in sections {
-        if let Some(last) = deduped.last() {
-            if sections_equivalent(last, &section) {
+        if let Some(last) = deduped.last_mut() {
+            if sections_same_span_title(last, &section) {
+                // Keep the richer explanation when chunk boundaries overlap.
+                if section.explanation.trim().chars().count()
+                    > last.explanation.trim().chars().count()
+                {
+                    last.explanation = section.explanation;
+                }
                 continue;
             }
         }
@@ -27,7 +33,7 @@ fn dedupe_sections(sections: Vec<NoteSection>) -> Vec<NoteSection> {
     deduped
 }
 
-fn sections_equivalent(a: &NoteSection, b: &NoteSection) -> bool {
+fn sections_same_span_title(a: &NoteSection, b: &NoteSection) -> bool {
     a.start_ms == b.start_ms
         && a.end_ms == b.end_ms
         && a.title.trim().eq_ignore_ascii_case(b.title.trim())
@@ -116,6 +122,35 @@ mod tests {
         ];
         let (sections, _) = merge_chunk_outputs(&outputs);
         assert_eq!(sections.len(), 1);
+    }
+
+    #[test]
+    fn merge_keeps_richer_explanation_on_overlap() {
+        let short = NoteSection {
+            start_ms: 1000,
+            end_ms: 2000,
+            title: "Same".to_string(),
+            explanation: "short".to_string(),
+        };
+        let long = NoteSection {
+            start_ms: 1000,
+            end_ms: 2000,
+            title: "same".to_string(),
+            explanation: "a much longer explanation with detail".to_string(),
+        };
+        let outputs = vec![
+            ChunkLlmOutput {
+                summary: "a".to_string(),
+                sections: vec![short],
+            },
+            ChunkLlmOutput {
+                summary: "b".to_string(),
+                sections: vec![long.clone()],
+            },
+        ];
+        let (sections, _) = merge_chunk_outputs(&outputs);
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].explanation, long.explanation);
     }
 
     #[test]

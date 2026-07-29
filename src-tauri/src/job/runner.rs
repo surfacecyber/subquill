@@ -46,7 +46,9 @@ pub fn run_note_job(
         started_at,
         &fetch,
         |progress| {
-            let _ = manager.update_progress(job_id, progress);
+            let _ = manager.update_progress(job_id, progress.clone());
+            // Emit mid-job progress so the UI need not wait for the 2s poll fallback.
+            emit_progress(&app, &progress);
         },
     ) {
         Ok(job_result) => finalize_success(&app, &manager, job_id, job_result),

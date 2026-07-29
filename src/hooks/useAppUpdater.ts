@@ -149,6 +149,7 @@ export function useAppUpdater({
       }
 
       operationRef.current = "checking";
+      safeSetState({ phase: "checking" });
 
       try {
         const result = await runUpdaterCheck(runtime, isDevBuild);

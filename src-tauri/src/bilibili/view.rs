@@ -118,7 +118,7 @@ fn normalize_pages(data: &ViewApiData) -> Result<Vec<VideoPage>> {
         cid: data.cid,
         page: 1,
         part: data.title.clone(),
-        duration: 0,
+        duration: data.duration,
     }])
 }
 
@@ -148,7 +148,7 @@ fn select_page(pages: &[VideoPage], requested_p: u32, page_count: u32) -> Result
 
     Ok(SelectedPage {
         cid: page.cid,
-        p: requested_p,
+        p: page.page,
         part_title,
         page_count,
         duration_secs: page.duration,
@@ -269,5 +269,52 @@ mod tests {
 
         let err = fetch_view(&transport, &video_ref).unwrap_err();
         assert_eq!(err.code(), "API_REJECTED");
+    }
+
+    #[test]
+    fn fetch_view_uses_root_duration_when_pages_empty() {
+        let transport = MockTransport::new(vec![(
+            "https://api.bilibili.com/x/web-interface/view?bvid=BV1xx411c7mD",
+            MockResponse::success(
+                r#"{
+                    "code": 0,
+                    "data": {
+                        "bvid": "BV1xx411c7mD",
+                        "aid": 170001,
+                        "title": "Main Title",
+                        "cid": 42,
+                        "duration": 321,
+                        "pages": []
+                    }
+                }"#,
+            ),
+        )]);
+
+        let video_ref = ParsedVideoRef {
+            bvid: Some("BV1xx411c7mD".to_string()),
+            aid: None,
+            p: None,
+            p_explicit: false,
+        };
+
+        let (_, selected) = fetch_view(&transport, &video_ref).unwrap();
+        assert_eq!(selected.cid, 42);
+        assert_eq!(selected.duration_secs, 321);
+        assert_eq!(selected.p, 1);
+    }
+
+    #[test]
+    fn select_page_records_actual_page_number_on_fallback() {
+        let pages = vec![
+            VideoPage {
+                cid: 10,
+                page: 2,
+                part: "Only".to_string(),
+                duration: 50,
+            },
+        ];
+        let selected = select_page(&pages, 1, 1).unwrap();
+        assert_eq!(selected.cid, 10);
+        assert_eq!(selected.p, 2);
     }
 }

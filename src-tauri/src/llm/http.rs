@@ -12,13 +12,27 @@ use super::error::{LlmError, Result};
 
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_TOTAL_TIMEOUT: Duration = Duration::from_secs(60);
+/// Floor / ceiling for per-request timeouts scaled by `max_tokens`.
+pub const MIN_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+pub const MAX_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 pub const MAX_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
+
+/// Scale HTTP timeout with expected generation size (~20 tokens/sec + overhead).
+pub fn timeout_for_max_tokens(max_tokens: u32) -> Duration {
+    let secs = (u64::from(max_tokens) / 20).clamp(
+        MIN_REQUEST_TIMEOUT.as_secs(),
+        MAX_REQUEST_TIMEOUT.as_secs(),
+    );
+    Duration::from_secs(secs)
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct HttpRequest {
     pub url: String,
     pub body: String,
     pub api_key: String,
+    /// Optional per-request timeout; falls back to the transport default.
+    pub timeout: Option<Duration>,
 }
 
 impl fmt::Debug for HttpRequest {
@@ -83,13 +97,16 @@ impl HttpTransport for ReqwestTransport {
     fn send(&self, request: HttpRequest) -> Result<HttpResponse> {
         let headers = build_headers(&request.api_key)?;
 
-        let mut response = self
+        let mut builder = self
             .client
             .post(&request.url)
             .headers(headers)
-            .body(request.body)
-            .send()
-            .map_err(map_reqwest_error)?;
+            .body(request.body);
+        if let Some(timeout) = request.timeout {
+            builder = builder.timeout(timeout);
+        }
+
+        let mut response = builder.send().map_err(map_reqwest_error)?;
 
         let status = response.status().as_u16();
         check_content_length(response.content_length())?;
@@ -200,6 +217,7 @@ pub mod mock {
                 url: "https://example.com".to_string(),
                 body: body.to_string(),
                 api_key: "sk-test".to_string(),
+                timeout: None,
             })
         };
 
@@ -213,9 +231,19 @@ pub mod mock {
             url: "https://example.com".to_string(),
             body: "{}".to_string(),
             api_key: "sk-secret-debug-key".to_string(),
+            timeout: None,
         };
         let debug = format!("{request:?}");
         assert!(!debug.contains("sk-secret-debug-key"));
         assert!(debug.contains(REDACTED));
+    }
+
+    #[test]
+    fn timeout_for_max_tokens_scales_and_clamps() {
+        assert_eq!(timeout_for_max_tokens(1_000), MIN_REQUEST_TIMEOUT); // 50 → 60
+        assert_eq!(timeout_for_max_tokens(4_096), Duration::from_secs(204)); // 4096/20
+        assert_eq!(timeout_for_max_tokens(2_000), Duration::from_secs(100));
+        assert_eq!(timeout_for_max_tokens(8_000), MAX_REQUEST_TIMEOUT); // 400 → 300
+        assert_eq!(timeout_for_max_tokens(16_384), MAX_REQUEST_TIMEOUT);
     }
 }
