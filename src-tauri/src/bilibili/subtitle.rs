@@ -87,7 +87,7 @@ pub fn validate_subtitle_coverage(
         .filter(|segment| !is_non_speech_placeholder(&segment.text))
         .collect();
 
-    if speech_segments.len() < 3 {
+    if speech_segments.is_empty() {
         return Err(BilibiliError::subtitle_corrupt(
             "subtitle payload has too little usable speech content",
         ));
@@ -302,6 +302,12 @@ mod tests {
             end_ms,
             text: text.to_string(),
         }
+    }
+
+    #[test]
+    fn validate_accepts_short_video_with_one_speech_segment() {
+        let segments = vec![seg(0, 2_000, "hello")];
+        validate_subtitle_coverage(&segments, 5).unwrap();
     }
 
     #[test]

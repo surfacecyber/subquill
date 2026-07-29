@@ -91,10 +91,13 @@ impl<T: HttpTransport> LlmClient<T> {
         let body = serde_json::to_string(&request)
             .map_err(|_| LlmError::api("failed to encode chat request"))?;
 
+        let timeout = max_tokens.map(super::http::timeout_for_max_tokens);
+
         let response = self.transport.send(HttpRequest {
             url: self.endpoint.to_string(),
             body,
             api_key: self.api_key.clone(),
+            timeout,
         })?;
 
         map_http_response(response, &self.api_key)
