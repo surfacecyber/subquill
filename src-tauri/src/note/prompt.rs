@@ -30,6 +30,7 @@ pub fn chunk_user_prompt(
     metadata: &VideoMetadata,
     chunk: &SubtitleChunk,
     locale: NoteLocale,
+    full_pass: bool,
 ) -> String {
     let mut lines = Vec::new();
     match locale {
@@ -39,14 +40,25 @@ pub fn chunk_user_prompt(
                 lines.push(format!("分 P 标题：{}", part));
             }
             lines.push(format!("视频 ID：{}", metadata.bvid));
-            lines.push(format!(
-                "本块时间范围：{} - {}（毫秒 {}-{}）",
-                format_timestamp(chunk.start_ms),
-                format_timestamp(chunk.end_ms),
-                chunk.start_ms,
-                chunk.end_ms
-            ));
-            lines.push("字幕（逐行，请勿改写）：".to_string());
+            if full_pass {
+                lines.push(format!(
+                    "整场时间范围：{} - {}（毫秒 {}-{}）",
+                    format_timestamp(chunk.start_ms),
+                    format_timestamp(chunk.end_ms),
+                    chunk.start_ms,
+                    chunk.end_ms
+                ));
+                lines.push("整场字幕（逐行，请勿改写）：".to_string());
+            } else {
+                lines.push(format!(
+                    "本块时间范围：{} - {}（毫秒 {}-{}）",
+                    format_timestamp(chunk.start_ms),
+                    format_timestamp(chunk.end_ms),
+                    chunk.start_ms,
+                    chunk.end_ms
+                ));
+                lines.push("字幕（逐行，请勿改写）：".to_string());
+            }
         }
         NoteLocale::En => {
             lines.push(format!("Video title: {}", metadata.title));
@@ -54,14 +66,25 @@ pub fn chunk_user_prompt(
                 lines.push(format!("Part title: {}", part));
             }
             lines.push(format!("Video id: {}", metadata.bvid));
-            lines.push(format!(
-                "Chunk range: {} - {} (ms {}-{})",
-                format_timestamp(chunk.start_ms),
-                format_timestamp(chunk.end_ms),
-                chunk.start_ms,
-                chunk.end_ms
-            ));
-            lines.push("Subtitles (line by line, do not rewrite):".to_string());
+            if full_pass {
+                lines.push(format!(
+                    "Full video range: {} - {} (ms {}-{})",
+                    format_timestamp(chunk.start_ms),
+                    format_timestamp(chunk.end_ms),
+                    chunk.start_ms,
+                    chunk.end_ms
+                ));
+                lines.push("Full transcript (line by line, do not rewrite):".to_string());
+            } else {
+                lines.push(format!(
+                    "Chunk range: {} - {} (ms {}-{})",
+                    format_timestamp(chunk.start_ms),
+                    format_timestamp(chunk.end_ms),
+                    chunk.start_ms,
+                    chunk.end_ms
+                ));
+                lines.push("Subtitles (line by line, do not rewrite):".to_string());
+            }
         }
     }
 
@@ -149,10 +172,11 @@ pub fn chunk_messages(
     metadata: &VideoMetadata,
     chunk: &SubtitleChunk,
     locale: NoteLocale,
+    full_pass: bool,
 ) -> Vec<ChatMessage> {
     vec![
         ChatMessage::system(chunk_system_prompt(locale)),
-        ChatMessage::user(chunk_user_prompt(metadata, chunk, locale)),
+        ChatMessage::user(chunk_user_prompt(metadata, chunk, locale, full_pass)),
     ]
 }
 
@@ -160,10 +184,11 @@ pub fn chunk_fix_messages(
     metadata: &VideoMetadata,
     chunk: &SubtitleChunk,
     locale: NoteLocale,
+    full_pass: bool,
     invalid_json: &str,
     reason: &str,
 ) -> Vec<ChatMessage> {
-    let mut messages = chunk_messages(metadata, chunk, locale);
+    let mut messages = chunk_messages(metadata, chunk, locale, full_pass);
     messages.push(ChatMessage::user(chunk_fix_prompt(
         locale,
         invalid_json,
@@ -197,6 +222,29 @@ pub fn summary_merge_fix_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bilibili::SubtitleSegment;
+
+    fn meta() -> VideoMetadata {
+        VideoMetadata {
+            title: "T".to_string(),
+            part_title: None,
+            bvid: "BV1".to_string(),
+            duration_ms: 3000,
+        }
+    }
+
+    fn chunk() -> SubtitleChunk {
+        SubtitleChunk {
+            index: 0,
+            start_ms: 0,
+            end_ms: 2000,
+            segments: vec![SubtitleSegment {
+                start_ms: 0,
+                end_ms: 2000,
+                text: "hello".to_string(),
+            }],
+        }
+    }
 
     #[test]
     fn truncate_for_fix_prompt_limits_unicode_chars() {
@@ -211,5 +259,18 @@ mod tests {
         let text = "🎬".repeat(CHUNK_FIX_CONTENT_MAX_CHARS + 10);
         let clipped = truncate_for_fix_prompt(&text);
         assert!(clipped.is_char_boundary(clipped.len()));
+    }
+
+    #[test]
+    fn full_pass_prompt_uses_whole_transcript_wording() {
+        let full = chunk_user_prompt(&meta(), &chunk(), NoteLocale::Zh, true);
+        assert!(full.contains("整场字幕"));
+        assert!(full.contains("整场时间范围"));
+        assert!(!full.contains("本块时间范围"));
+
+        let part = chunk_user_prompt(&meta(), &chunk(), NoteLocale::En, false);
+        assert!(part.contains("Chunk range"));
+        assert!(part.contains("Subtitles (line by line"));
+        assert!(!part.contains("Full transcript"));
     }
 }

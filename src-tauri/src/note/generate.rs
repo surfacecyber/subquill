@@ -1,7 +1,7 @@
 use crate::bilibili::SubtitleSegment;
 use crate::llm::{LlmClient, LlmError};
 
-use super::chunk::chunk_segments;
+use super::chunk::{plan_chunks, segments_prompt_char_count};
 use super::error::{NoteError, NoteResult};
 use super::merge::{fallback_merge_summaries, merge_chunk_outputs, parse_summary_merge_output};
 use super::prompt::{
@@ -12,7 +12,8 @@ use super::types::{
 };
 use super::validate::parse_and_validate_chunk_output;
 
-const CHUNK_MAX_TOKENS: u32 = 2_048;
+const MAX_TOKENS_MIN: u32 = 4_096;
+const MAX_TOKENS_MAX: u32 = 16_384;
 const SUMMARY_MERGE_MAX_TOKENS: u32 = 1_024;
 
 pub fn generate_note_data<T: crate::llm::HttpTransport>(
@@ -28,8 +29,9 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
     }
 
     let duration_ms = metadata.duration_ms;
-    let chunks = chunk_segments(&segments);
+    let chunks = plan_chunks(&segments);
     let chunk_count = chunks.len().max(1);
+    let full_pass = chunks.len() == 1;
 
     progress(NoteProgress {
         stage: NoteProgressStage::Chunking,
@@ -56,7 +58,7 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
             chunk_count,
         });
 
-        let output = analyze_chunk(client, &metadata, chunk, locale, duration_ms)?;
+        let output = analyze_chunk(client, &metadata, chunk, locale, duration_ms, full_pass)?;
         if cancellation_check() {
             return Err(NoteError::Cancelled);
         }
@@ -106,25 +108,35 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
     })
 }
 
+fn max_tokens_for_chunk(chunk: &SubtitleChunk) -> u32 {
+    let prompt_chars = segments_prompt_char_count(&chunk.segments);
+    // Longer transcripts need more room for section JSON; clamp to a safe range.
+    let estimated = (prompt_chars / 4) as u32;
+    estimated.clamp(MAX_TOKENS_MIN, MAX_TOKENS_MAX)
+}
+
 fn analyze_chunk<T: crate::llm::HttpTransport>(
     client: &LlmClient<T>,
     metadata: &VideoMetadata,
     chunk: &SubtitleChunk,
     locale: NoteLocale,
     video_duration_ms: u64,
+    full_pass: bool,
 ) -> NoteResult<super::types::ChunkLlmOutput> {
-    let messages = chunk_messages(metadata, chunk, locale);
+    let max_tokens = max_tokens_for_chunk(chunk);
+    let messages = chunk_messages(metadata, chunk, locale, full_pass);
     let content = client
-        .chat(messages, Some(CHUNK_MAX_TOKENS))
+        .chat(messages, Some(max_tokens))
         .map_err(NoteError::Llm)?;
 
     match parse_and_validate_chunk_output(&content, chunk, video_duration_ms) {
         Ok(output) => Ok(output),
         Err(first_err) => {
             let reason = first_err.to_string();
-            let fix_messages = chunk_fix_messages(metadata, chunk, locale, &content, &reason);
+            let fix_messages =
+                chunk_fix_messages(metadata, chunk, locale, full_pass, &content, &reason);
             let fixed_content = client
-                .chat(fix_messages, Some(CHUNK_MAX_TOKENS))
+                .chat(fix_messages, Some(max_tokens))
                 .map_err(NoteError::Llm)?;
             parse_and_validate_chunk_output(&fixed_content, chunk, video_duration_ms)
                 .map_err(NoteError::Llm)
@@ -218,6 +230,7 @@ mod tests {
 
         let segments = vec![segment(1000, 2000, "hello world")];
         let meta = metadata(3000);
+        let mut analyze_count = 0usize;
 
         let data = generate_note_data(
             &client,
@@ -225,10 +238,16 @@ mod tests {
             segments.clone(),
             NoteLocale::En,
             || false,
-            |_| {},
+            |p| {
+                if p.stage == NoteProgressStage::AnalyzingChunk {
+                    analyze_count += 1;
+                    assert_eq!(p.chunk_count, 1);
+                }
+            },
         )
         .expect("generate");
 
+        assert_eq!(analyze_count, 1);
         assert_eq!(data.summary, "overall");
         assert_eq!(data.segments, segments);
         assert_eq!(data.sections.len(), 1);
@@ -236,6 +255,25 @@ mod tests {
         let md = render_markdown(&data, NoteLocale::En);
         assert!(md.contains("hello world"));
         assert!(md.contains("overall"));
+    }
+
+    #[test]
+    fn max_tokens_scales_with_chunk_size() {
+        let small = SubtitleChunk {
+            index: 0,
+            start_ms: 0,
+            end_ms: 1000,
+            segments: vec![segment(0, 1000, "hi")],
+        };
+        assert_eq!(max_tokens_for_chunk(&small), MAX_TOKENS_MIN);
+
+        let large = SubtitleChunk {
+            index: 0,
+            start_ms: 0,
+            end_ms: 1000,
+            segments: vec![segment(0, 1000, &"x".repeat(80_000))],
+        };
+        assert_eq!(max_tokens_for_chunk(&large), MAX_TOKENS_MAX);
     }
 
     #[test]
@@ -253,12 +291,12 @@ mod tests {
         let big_a = segment(
             1000,
             2000,
-            &"x".repeat(super::super::chunk::CHUNK_CHAR_BUDGET + 50),
+            &"x".repeat(super::super::chunk::LARGE_CHUNK_CHAR_BUDGET + 50),
         );
         let big_b = segment(
             5000,
             6000,
-            &"y".repeat(super::super::chunk::CHUNK_CHAR_BUDGET + 50),
+            &"y".repeat(super::super::chunk::LARGE_CHUNK_CHAR_BUDGET + 50),
         );
         let segments = vec![big_a, big_b];
 
@@ -310,12 +348,12 @@ mod tests {
         let big_a = segment(
             1000,
             2000,
-            &"x".repeat(super::super::chunk::CHUNK_CHAR_BUDGET + 50),
+            &"x".repeat(super::super::chunk::LARGE_CHUNK_CHAR_BUDGET + 50),
         );
         let big_b = segment(
             5000,
             6000,
-            &"y".repeat(super::super::chunk::CHUNK_CHAR_BUDGET + 50),
+            &"y".repeat(super::super::chunk::LARGE_CHUNK_CHAR_BUDGET + 50),
         );
 
         let data = generate_note_data(
@@ -345,12 +383,12 @@ mod tests {
         let big_a = segment(
             1000,
             2000,
-            &"x".repeat(super::super::chunk::CHUNK_CHAR_BUDGET + 50),
+            &"x".repeat(super::super::chunk::LARGE_CHUNK_CHAR_BUDGET + 50),
         );
         let big_b = segment(
             5000,
             6000,
-            &"y".repeat(super::super::chunk::CHUNK_CHAR_BUDGET + 50),
+            &"y".repeat(super::super::chunk::LARGE_CHUNK_CHAR_BUDGET + 50),
         );
 
         let err = generate_note_data(

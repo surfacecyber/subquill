@@ -2,11 +2,31 @@ use crate::bilibili::SubtitleSegment;
 
 use super::types::SubtitleChunk;
 
-/// Conservative per-chunk character budget for subtitle prompt lines (metadata + text).
-pub const CHUNK_CHAR_BUDGET: usize = 3_500;
+/// Prefer a single LLM pass when total subtitle prompt lines fit under this limit.
+pub const SINGLE_PASS_CHAR_LIMIT: usize = 80_000;
 
-/// Split subtitle segments into chunks at complete segment boundaries.
-pub fn chunk_segments(segments: &[SubtitleSegment]) -> Vec<SubtitleChunk> {
+/// Per-chunk character budget used only when content exceeds [`SINGLE_PASS_CHAR_LIMIT`].
+pub const LARGE_CHUNK_CHAR_BUDGET: usize = 40_000;
+
+/// Plan chunks: single pass under the limit; otherwise split into large chunks.
+pub fn plan_chunks(segments: &[SubtitleSegment]) -> Vec<SubtitleChunk> {
+    if segments.is_empty() {
+        return Vec::new();
+    }
+
+    let total = segments_prompt_char_count(segments);
+    if total <= SINGLE_PASS_CHAR_LIMIT {
+        return vec![push_chunk_value(0, segments)];
+    }
+
+    chunk_segments_with_budget(segments, LARGE_CHUNK_CHAR_BUDGET)
+}
+
+/// Split using an explicit character budget (segment boundaries only).
+pub fn chunk_segments_with_budget(
+    segments: &[SubtitleSegment],
+    budget: usize,
+) -> Vec<SubtitleChunk> {
     if segments.is_empty() {
         return Vec::new();
     }
@@ -20,10 +40,10 @@ pub fn chunk_segments(segments: &[SubtitleSegment]) -> Vec<SubtitleChunk> {
         let line_chars = prompt_line_char_count(segment);
 
         if !current_segments.is_empty()
-            && current_chars + line_chars > CHUNK_CHAR_BUDGET
+            && current_chars + line_chars > budget
             && current_chars > 0
         {
-            push_chunk(&mut chunks, chunk_index, &current_segments);
+            chunks.push(push_chunk_value(chunk_index, &current_segments));
             chunk_index += 1;
             current_segments.clear();
             current_chars = 0;
@@ -34,21 +54,25 @@ pub fn chunk_segments(segments: &[SubtitleSegment]) -> Vec<SubtitleChunk> {
     }
 
     if !current_segments.is_empty() {
-        push_chunk(&mut chunks, chunk_index, &current_segments);
+        chunks.push(push_chunk_value(chunk_index, &current_segments));
     }
 
     chunks
 }
 
-fn push_chunk(chunks: &mut Vec<SubtitleChunk>, index: usize, segments: &[SubtitleSegment]) {
+pub fn segments_prompt_char_count(segments: &[SubtitleSegment]) -> usize {
+    segments.iter().map(prompt_line_char_count).sum()
+}
+
+fn push_chunk_value(index: usize, segments: &[SubtitleSegment]) -> SubtitleChunk {
     let start_ms = segments.first().map(|s| s.start_ms).unwrap_or(0);
     let end_ms = segments.last().map(|s| s.end_ms).unwrap_or(start_ms);
-    chunks.push(SubtitleChunk {
+    SubtitleChunk {
         index,
         start_ms,
         end_ms,
         segments: segments.to_vec(),
-    });
+    }
 }
 
 fn prompt_line_char_count(segment: &SubtitleSegment) -> usize {
@@ -88,20 +112,32 @@ mod tests {
             segment(1000, 2000, "b"),
             segment(2000, 3000, "c"),
         ];
-        let chunks = chunk_segments(&segments);
+        let chunks = plan_chunks(&segments);
         let merged: Vec<_> = chunks
             .iter()
             .flat_map(|c| c.segments.iter())
             .cloned()
             .collect();
         assert_eq!(merged, segments);
+        assert_eq!(chunks.len(), 1);
     }
 
     #[test]
-    fn oversized_single_segment_forms_own_chunk() {
-        let big = "x".repeat(CHUNK_CHAR_BUDGET + 100);
+    fn short_content_stays_single_pass() {
+        let segments = vec![
+            segment(0, 1000, &"x".repeat(10_000)),
+            segment(1000, 2000, &"y".repeat(10_000)),
+        ];
+        let chunks = plan_chunks(&segments);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].segments.len(), 2);
+    }
+
+    #[test]
+    fn oversized_single_segment_forms_own_chunk_when_splitting() {
+        let big = "x".repeat(LARGE_CHUNK_CHAR_BUDGET + 100);
         let segments = vec![segment(0, 1000, &big), segment(1000, 2000, "tail")];
-        let chunks = chunk_segments(&segments);
+        let chunks = chunk_segments_with_budget(&segments, LARGE_CHUNK_CHAR_BUDGET);
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].segments.len(), 1);
         assert_eq!(chunks[1].segments.len(), 1);
@@ -109,9 +145,19 @@ mod tests {
     }
 
     #[test]
+    fn plan_chunks_splits_when_over_single_pass_limit() {
+        let big_a = segment(1000, 2000, &"x".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
+        let big_b = segment(5000, 6000, &"y".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
+        let segments = [big_a.clone(), big_b.clone()];
+        assert!(segments_prompt_char_count(&segments) > SINGLE_PASS_CHAR_LIMIT);
+        let chunks = plan_chunks(&segments);
+        assert_eq!(chunks.len(), 2);
+    }
+
+    #[test]
     fn chunk_records_start_and_end_ms() {
         let segments = vec![segment(500, 1500, "a"), segment(1500, 2500, "b")];
-        let chunks = chunk_segments(&segments);
+        let chunks = plan_chunks(&segments);
         assert_eq!(chunks[0].start_ms, 500);
         assert_eq!(chunks[0].end_ms, 2500);
     }
@@ -120,9 +166,9 @@ mod tests {
     fn two_big_segments_form_two_chunks_that_validate() {
         use super::super::validate::parse_and_validate_chunk_output;
 
-        let big_a = segment(1000, 2000, &"x".repeat(CHUNK_CHAR_BUDGET + 50));
-        let big_b = segment(5000, 6000, &"y".repeat(CHUNK_CHAR_BUDGET + 50));
-        let chunks = chunk_segments(&[big_a, big_b]);
+        let big_a = segment(1000, 2000, &"x".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
+        let big_b = segment(5000, 6000, &"y".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
+        let chunks = plan_chunks(&[big_a, big_b]);
         assert_eq!(chunks.len(), 2);
 
         let chunk1 = r#"{"summary":"part one","sections":[{"start_ms":1000,"end_ms":2000,"title":"A","explanation":"first"}]}"#;
