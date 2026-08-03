@@ -1,5 +1,7 @@
 # Releasing OpenNote
 
+[中文](RELEASING.zh-CN.md) · [Docs index](README.md)
+
 This document describes how to configure GitHub Actions releases and the Tauri 2 updater for OpenNote.
 
 OpenNote separates three different trust layers:

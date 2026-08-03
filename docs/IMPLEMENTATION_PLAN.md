@@ -1,6 +1,8 @@
 # OpenNote Implementation Plan
 
-This document is the canonical engineering plan for OpenNote: a macOS + Windows desktop app (Tauri 2 + React + TypeScript + Vite) that generates study notes from **Bilibili** videos. Business logic lives in Rust; Tauri commands are a thin IPC adapter.
+[中文](IMPLEMENTATION_PLAN.zh-CN.md) · [Docs index](README.md)
+
+This document is the canonical engineering plan for OpenNote: a macOS + Windows desktop app (Tauri 2 + React + TypeScript + Vite) that generates study notes from **Bilibili** and **YouTube** video subtitles. Business logic lives in Rust; Tauri commands are a thin IPC adapter.
 
 ## Architecture principles
 
@@ -10,12 +12,14 @@ This document is the canonical engineering plan for OpenNote: a macOS + Windows 
 | `src-tauri/src/commands/` | Thin `#[tauri::command]` wrappers |
 | `src-tauri/src/settings/` | Versioned non-secret config (`settings.json`) |
 | `src-tauri/src/auth/` | Versioned secrets (`auth.json`), status-only IPC |
-| Future `bilibili/` | URL parse, view API, subtitle fetch — **implemented** |
+| `media/` | Route Bilibili / YouTube URLs; unified preview + subtitle fetch — **implemented** |
+| `bilibili/` | URL parse, view API, subtitle fetch — **implemented** |
+| `youtube/` | URL parse, InnerTube player API, public captions — **implemented** |
 | `llm/` | OpenAI-compatible client, JSON validation — **implemented** |
 | `note/` | In-memory note assembly, chunking, Markdown — **implemented** |
-| Future `job/` | `job_id`, cancel, timeout, progress events — **implemented** |
+| `job/` | `job_id`, cancel, timeout, progress events — **implemented** |
 
-Reserved modules are documented here and in `src-tauri/src/lib.rs` comments. Do **not** add empty Rust modules that compile but do nothing.
+Do **not** add empty Rust modules that compile but do nothing.
 
 ## Repository layout
 
@@ -46,6 +50,7 @@ Non-secret, safe to log field names (not values in production):
 - `model`
 - `locale` — `zh` | `en` | `system`
 - `onboarding_completed`
+- `notes_save_dir` — optional absolute path; when set, completed notes are auto-written as Markdown files
 
 **Never** store `api_key`, cookies, or tokens in `settings.json`.
 
@@ -87,7 +92,7 @@ IPC rule: frontend receives **booleans only** via `get_auth_status` (`has_api_ke
 
 ### Markdown as untrusted input
 
-LLM output and fetched descriptions will be rendered as Markdown later. Treat all Markdown as **untrusted**:
+LLM output and fetched descriptions are rendered as Markdown. Treat all Markdown as **untrusted**:
 
 - Sanitize or use a safe renderer (no raw `dangerouslySetInnerHTML` without a vetted pipeline).
 - Block `javascript:`, event handlers, and remote resource loads in rendered HTML.
@@ -97,7 +102,7 @@ LLM output and fetched descriptions will be rendered as Markdown later. Treat al
 
 - Minimal `core:default` only for the main window.
 - No broad `shell`, `fs`, or `http` plugin scopes unless a feature needs them.
-- Prefer Rust-side HTTP (`reqwest` in future `bilibili/` / `llm/`) over giving the webview network access to third parties.
+- Prefer Rust-side HTTP (`reqwest` in `bilibili/` / `youtube/` / `llm/`) over giving the webview network access to third parties.
 
 ### Code signing vs updater signing
 
@@ -127,8 +132,9 @@ Standard codes:
 | `SERIALIZATION_ERROR` | Corrupt or unsupported JSON version |
 | `NETWORK_ERROR` | HTTP transport failures |
 | `SHORT_LINK_FAILED` | b23.tv resolution failed |
-| `VIDEO_NOT_FOUND` | View API: video missing |
-| `API_REJECTED` | Bilibili API returned non-zero code |
+| `VIDEO_NOT_FOUND` | View / player API: video missing |
+| `VIDEO_RESTRICTED` | YouTube (or similar): login / age / region restriction; app does not support YouTube accounts |
+| `API_REJECTED` | Platform API returned a rejected / non-zero response |
 | `PART_OUT_OF_RANGE` | Requested `p` exceeds page count |
 | `AUTH_REQUIRED` | Login cookie likely required (e.g. missing `subtitle_url`) |
 | `RATE_LIMITED` | HTTP 412 / 429 from Bilibili |
@@ -162,9 +168,18 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 - `get_job_result`: returns Markdown result when `completed`; returns stored `ErrorPayload` when `failed`; returns `JOB_CANCELLED` (or stored error) when `cancelled`; only `queued`/`running` return `JOB_NOT_READY`.
 - `cancel_job`: sets the cancel token and returns `cancel_requested: true` while status may still be `running` until the background task observes cancellation.
 - Job deadline: 30 minutes wall-clock (`JOB_DEADLINE`). Per-request HTTP timeouts remain unchanged.
-- **Cancellation semantics**: cancel sets an in-memory flag checked after Bilibili fetch, before/after each LLM chunk, after render, and atomically inside `JobManager::complete` (cancel wins over late success). Blocking HTTP cannot be interrupted mid-request; results from in-flight requests are discarded once they return if cancel was requested.
-- Finished result stores final Markdown, title, bvid, language, `segment_count` — not full intermediate LLM responses.
+- **Cancellation semantics**: cancel sets an in-memory flag checked after subtitle fetch, before/after each LLM chunk, after render, and atomically inside `JobManager::complete` (cancel wins over late success). Blocking HTTP cannot be interrupted mid-request; results from in-flight requests are discarded once they return if cancel was requested.
+- Finished result stores final Markdown, title, video id / bvid, language, `segment_count` — not full intermediate LLM responses.
 - All state in Rust memory only (no DB in v1); app exit clears jobs.
+
+## Media routing (`media/`)
+
+**Status: implemented.**
+
+- Detect YouTube vs Bilibili from the URL host / shape.
+- `preview_video` and `fetch_subtitles` share one entry point; cookie is passed only into the Bilibili path.
+- YouTube results are adapted into the same subtitle / preview shapes the note pipeline already consumes.
+- Workspace UI calls `preview_video` / job start; legacy `fetch_bilibili_subtitles` remains as a thin command for Bilibili-only fetch.
 
 ## Bilibili integration (`bilibili/`)
 
@@ -183,6 +198,16 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 
 - **Player API**: v1 calls `/x/player/wbi/v2` with `bvid`+`cid` (aligned with BiliNote). Avoid `/x/player/v2?aid=…` which may return empty or mismatched AI subtitle URLs. Empty lists / empty URLs are retried once.
 - Rate limits / ToS: see release checklist.
+
+## YouTube integration (`youtube/`)
+
+**Status: implemented (v1 public captions).**
+
+- Parse `youtube.com` / `youtu.be` / `m.youtube.com` / `music.youtube.com` (and `*.youtube.com`) watch, shorts, and short-link URLs.
+- Fetch metadata and caption tracks via the public InnerTube Android player endpoint (`youtubei/v1/player`); no YouTube account cookie.
+- Prefer usable caption tracks; download timedtext / JSON3 from allowlisted hosts.
+- Restricted / age-gated / login-required videos surface `VIDEO_RESTRICTED` — OpenNote does **not** support YouTube sign-in.
+- Unit tests cover URL parsing and selection; live network fetch tests are optional / ignored in normal CI.
 
 ## LLM integration (`llm/`)
 
@@ -226,14 +251,18 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 | Auth/settings separation | Assert serialized JSON field sets |
 | Frontend | Vitest for i18n and pure TS helpers |
 | Bilibili | URL parse, host allowlist, track priority, mock HTTP integration |
+| YouTube | URL parse / host checks, track selection, restricted-video mapping |
+| Media | Platform routing (Bilibili vs YouTube) |
 | LLM / note | Endpoint join, error mapping, chunk boundaries, validation, merge, Markdown escape, mock e2e |
 | Job | State machine, single-active enforcement, cancel idempotency, deadline/cancel mapping, progress payload safety, mock pipeline orchestration |
 | Integration | `tauri dev` manual; no real network in CI unit tests |
 
 ## Release checklist (later)
 
+See also [RELEASING.md](RELEASING.md) for the shipping pipeline.
+
 - [ ] OS code signing (macOS + Windows)
 - [ ] Tauri updater key pair in CI
-- [ ] CSP review after Markdown renderer lands
+- [ ] CSP review (Markdown renderer is in place; re-audit if HTML pipeline changes)
 - [ ] Secret redaction audit on logs
-- [ ] Bilibili ToS / rate limit review
+- [ ] Bilibili / YouTube ToS and rate-limit review
