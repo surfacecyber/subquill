@@ -364,6 +364,9 @@ html {
   overflow-y: auto;
   display: grid;
   gap: 16px;
+  /* Pane is often taller than content; default align-content:stretch
+     expands auto rows and vertically stretches buttons inside. */
+  align-content: start;
   /* Horizontal: restore page inset; vertical: room for focus rings. */
   padding: 4px 32px 12px;
 }
@@ -572,6 +575,7 @@ html {
 
 .workspace-empty .btn-secondary {
   justify-self: start;
+  align-self: start;
 }
 
 .error-settings-cta {
