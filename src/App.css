@@ -833,6 +833,7 @@ html {
   flex-direction: column;
   gap: 10px;
   width: min(360px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
   pointer-events: none;
 }
 
@@ -844,17 +845,32 @@ html {
   padding: 12px 14px;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
+  border-left-width: 3px;
   background: var(--color-surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, #000 12%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 14%, transparent);
   color: var(--color-text);
 }
 
+@media (prefers-color-scheme: dark) {
+  .notification {
+    box-shadow: 0 8px 22px color-mix(in srgb, #000 55%, transparent);
+  }
+}
+
 .notification-success {
-  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border));
+  border-left-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
 }
 
 .notification-error {
-  border-color: color-mix(in srgb, var(--color-error) 35%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-border));
+  border-left-color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 8%, var(--color-surface));
+}
+
+.notification-info {
+  border-left-color: var(--color-muted);
 }
 
 .notification-message {
@@ -870,9 +886,10 @@ html {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
+  margin: -2px -4px -2px 0;
   padding: 0;
   border: none;
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) - 2px);
   background: transparent;
   color: var(--color-muted);
   font: inherit;
