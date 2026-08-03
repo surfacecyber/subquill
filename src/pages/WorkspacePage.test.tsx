@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -97,6 +97,29 @@ describe("WorkspacePage", () => {
     await waitFor(() => {
       expect(generateButton).toBeDisabled();
     });
+  });
+
+  it("disables generate when input has no valid URL and toasts on submit", async () => {
+    const user = userEvent.setup();
+    renderWorkspace(<WorkspacePage locale="en" />);
+
+    const input = screen.getByLabelText("Video URL");
+    const generateButton = screen.getByRole("button", { name: "Generate notes" });
+
+    expect(generateButton).toBeDisabled();
+
+    await user.type(input, "not-a-url");
+    expect(generateButton).toBeDisabled();
+    expect(startNoteJob).not.toHaveBeenCalled();
+
+    fireEvent.submit(input.closest("form")!);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Paste at least one valid video URL/i),
+      ).toBeInTheDocument();
+    });
+    expect(startNoteJob).not.toHaveBeenCalled();
   });
 
   it("shows 1-based chunk progress and percent", async () => {

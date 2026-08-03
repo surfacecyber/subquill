@@ -54,6 +54,8 @@ const messages = {
     bilibiliUrlPlaceholder:
       "每行一个链接，例如：\nhttps://www.bilibili.com/video/BV…\nhttps://www.youtube.com/watch?v=…",
     bilibiliUrlHint: "可一次粘贴多条链接（每行一条）。多 P 视频可在链接加 ?p=2 指定分 P。",
+    invalidVideoUrls:
+      "请粘贴至少一条合法的视频链接（每行一条，需以 http:// 或 https:// 开头）。",
     workspaceEmptyHint:
       "粘贴 B 站或 YouTube 链接即可生成学习笔记。视频需有在线字幕（含 AI 字幕）；长视频可能需要几分钟。",
     workspaceEmptyCookieHint: "部分 B 站视频需配置 SESSDATA Cookie 才能拉取字幕。",
@@ -234,6 +236,8 @@ const messages = {
       "One URL per line, e.g.\nhttps://www.bilibili.com/video/BV…\nhttps://www.youtube.com/watch?v=…",
     bilibiliUrlHint:
       "Paste multiple links (one per line). For multi-part Bilibili videos, add ?p=2 to pick a part.",
+    invalidVideoUrls:
+      "Paste at least one valid video URL (one per line, starting with http:// or https://).",
     workspaceEmptyHint:
       "Paste a Bilibili or YouTube link to generate study notes. The video needs online captions (including AI captions). Long videos may take a few minutes.",
     workspaceEmptyCookieHint:

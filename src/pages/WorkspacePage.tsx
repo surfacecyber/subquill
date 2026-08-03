@@ -155,6 +155,7 @@ export function WorkspacePage({
     cancel,
   } = useNoteJob();
 
+  const hasValidVideoUrl = parseVideoUrls(url).length > 0;
   const batchResults = result?.batch_results ?? [];
   const selectedBatchResult =
     selectedBatchIndex === null
@@ -279,6 +280,7 @@ export function WorkspacePage({
 
     const urls = parseVideoUrls(url);
     if (urls.length === 0) {
+      notify("error", t(locale, "invalidVideoUrls"));
       return;
     }
 
@@ -572,7 +574,7 @@ export function WorkspacePage({
                   type="button"
                   className="btn-secondary"
                   onClick={() => void handleGenerate()}
-                  disabled={isActive || url.trim().length === 0}
+                  disabled={isActive || !hasValidVideoUrl}
                 >
                   {t(locale, "retryGenerate")}
                 </button>
@@ -677,7 +679,7 @@ export function WorkspacePage({
           <button
             type="submit"
             className="btn-primary"
-            disabled={isActive || url.trim().length === 0}
+            disabled={isActive || !hasValidVideoUrl}
           >
             {isActive
               ? t(locale, "generating")

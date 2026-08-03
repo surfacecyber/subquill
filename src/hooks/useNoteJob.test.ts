@@ -240,6 +240,10 @@ describe("useNoteJob listener cleanup", () => {
       progress: { job_id: "job-1", stage: "calling_llm" },
       batch_items: [],
     });
+    vi.mocked(getJobResult).mockRejectedValue({
+      code: "NETWORK_ERROR",
+      message: "network",
+    });
 
     const { result } = renderHook(() => useNoteJob());
 
@@ -268,5 +272,83 @@ describe("useNoteJob listener cleanup", () => {
 
     expect(startNoteJob).toHaveBeenCalledTimes(2);
     expect(result.current.jobId).toBe("job-2");
+  });
+
+  it("keeps partial batch notes when a job fails", async () => {
+    const unlisten = vi.fn();
+    let progressHandler:
+      | ((event: {
+          job_id: string;
+          stage: "failed" | "calling_llm";
+          error_code?: string;
+        }) => void)
+      | null = null;
+
+    vi.mocked(listenJobProgress).mockImplementation(async (handler) => {
+      progressHandler = handler;
+      return unlisten;
+    });
+    vi.mocked(startNoteJob).mockResolvedValue({ job_id: "job-1" });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-1",
+      status: "failed",
+      progress: { job_id: "job-1", stage: "failed", error_code: "INTERNAL_ERROR" },
+      error: { code: "INTERNAL_ERROR", message: "task failed" },
+      batch_items: [
+        {
+          index: 0,
+          url: "https://example.com/a",
+          status: "completed",
+          title: "A",
+        },
+        {
+          index: 1,
+          url: "https://example.com/b",
+          status: "pending",
+        },
+      ],
+    });
+    vi.mocked(getJobResult).mockResolvedValue({
+      markdown: "# A",
+      title: "A",
+      bvid: "BV0",
+      language: "zh-CN",
+      segment_count: 1,
+      batch_results: [
+        {
+          index: 0,
+          url: "https://example.com/a",
+          markdown: "# A",
+          title: "A",
+          bvid: "BV0",
+          language: "zh-CN",
+          segment_count: 1,
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useNoteJob());
+
+    await act(async () => {
+      await result.current.start([
+        "https://example.com/a",
+        "https://example.com/b",
+      ]);
+    });
+
+    await act(async () => {
+      progressHandler?.({
+        job_id: "job-1",
+        stage: "failed",
+        error_code: "INTERNAL_ERROR",
+      });
+      await Promise.resolve();
+    });
+
+    expect(getJobResult).toHaveBeenCalledWith("job-1");
+    expect(result.current.result?.title).toBe("A");
+    expect(result.current.result?.batch_results).toHaveLength(1);
+    expect(result.current.error?.code).toBe("INTERNAL_ERROR");
+    expect(result.current.isActive).toBe(false);
   });
 });
