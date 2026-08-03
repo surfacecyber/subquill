@@ -282,6 +282,55 @@ describe("ConfigForm", () => {
     confirmSpy.mockRestore();
   });
 
+  it("clears cookie only after confirmation", async () => {
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: true,
+    });
+    vi.mocked(saveAuth).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const user = userEvent.setup();
+    render(
+      <ConfigForm
+        mode="settings"
+        locale="en"
+        initialSettings={{ ...baseSettings, onboarding_completed: true }}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    const clearButton = await screen.findByRole("button", {
+      name: "Clear cookie",
+    });
+    await user.click(clearButton);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(saveAuth).toHaveBeenCalledWith({ clear_bilibili_cookie: true });
+      expect(screen.getByText("Cookie cleared")).toBeInTheDocument();
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it("collapses cookie instructions behind a details summary", () => {
+    render(
+      <ConfigForm
+        mode="onboarding"
+        locale="en"
+        initialSettings={baseSettings}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    const summary = screen.getByText("How do I get SESSDATA?");
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+  });
+
   it("clears notes save location immediately without waiting for Save", async () => {
     const onSettingsSaved = vi.fn();
     vi.mocked(getAuthStatus).mockResolvedValue({

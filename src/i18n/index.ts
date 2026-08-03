@@ -5,9 +5,10 @@ export type UiLocale = "zh" | "en";
 const messages = {
   zh: {
     appTitle: "OpenNote",
-    navWorkspace: "笔记",
+    navWorkspace: "生成笔记",
     navSettings: "设置",
     navAbout: "关于",
+    navAriaLabel: "主导航",
     setupTitle: "首次设置",
     setupSubtitle:
       "配置 OpenAI 兼容接口与语言偏好。密钥仅保存在本机安全目录，不会显示在界面上。",
@@ -38,7 +39,9 @@ const messages = {
     clearApiKeyConfirm:
       "清除已保存的 API Key？清除后需重新填写才能生成笔记。",
     clearCookie: "清除 Cookie",
+    clearCookieConfirm: "清除已保存的 B 站 Cookie？部分视频之后可能无法拉取字幕。",
     cookieCleared: "Cookie 已清除",
+    bilibiliCookieHowTo: "如何获取 SESSDATA？",
     notesSaveDir: "笔记保存位置",
     notesSaveDirHint:
       "可选。配置后，生成完成的笔记会自动保存为 Markdown 到该目录。留空则仅保存在应用内预览。",
@@ -50,25 +53,56 @@ const messages = {
     bilibiliUrl: "视频链接",
     bilibiliUrlPlaceholder:
       "https://www.bilibili.com/video/BV… 或 https://www.youtube.com/watch?v=…",
+    bilibiliUrlHint: "多 P 视频可在链接加 ?p=2 指定分 P。",
+    workspaceEmptyHint:
+      "粘贴 B 站或 YouTube 链接即可生成学习笔记。视频需有在线字幕（含 AI 字幕）；长视频可能需要几分钟。",
+    workspaceEmptyCookieHint: "部分 B 站视频需配置 SESSDATA Cookie 才能拉取字幕。",
+    openSettings: "打开设置",
+    retryGenerate: "重试",
     generate: "生成笔记",
     generating: "生成中…",
     cancel: "取消",
     cancelRequested: "取消已请求",
     cancelRequestedHint:
       "后台任务可能仍在进行；若 HTTP 请求阻塞，停止可能稍有延迟。",
+    progressEtaHint: "长视频可能需要几分钟，请耐心等待。",
+    progressPercent: "{percent}%",
+    videoPreviewLoading: "正在识别视频…",
+    videoPreviewDuration: "时长 {duration}",
+    videoPreviewPart: "第 {p} / {total} P",
+    videoPreviewSubtitlesYes: "检测到字幕轨道",
+    videoPreviewSubtitlesNo: "未检测到字幕轨道",
+    videoPreviewAuthRequired: "可能需要配置 B 站 Cookie 才能拉取字幕",
+    saveDirGuide:
+      "生成成功。可在设置中配置笔记保存位置，之后将自动保存为 Markdown。",
+    saveDirGuideDismiss: "知道了",
+    unsavedSettingsConfirm: "设置尚未保存，确定离开并丢弃更改？",
     copyMarkdown: "复制 Markdown",
     exportMarkdown: "另存为 .md",
+    revealInFolder: "在文件夹中显示",
+    revealFailed: "无法打开文件夹，请手动前往保存路径。",
     copied: "已复制到剪贴板",
     copyFailed: "无法访问剪贴板。请手动选择预览内容复制。",
     exportSaved: "已保存 Markdown 文件",
     exportCancelled: "已取消保存",
     exportFailed: "导出失败",
     previewTitle: "笔记预览",
+    segmentCount: "{count} 段字幕",
     loading: "加载中…",
     loadSettingsFailed: "无法加载设置。",
     aboutTitle: "关于 OpenNote",
     aboutDescription: "从 B 站 / YouTube 视频字幕生成学习笔记的桌面应用。",
+    aboutPlatformsTitle: "支持平台",
+    aboutPlatforms: "Bilibili、YouTube（公开字幕）。",
+    aboutPrivacyTitle: "隐私",
+    aboutPrivacy:
+      "API Key 与 B 站 Cookie 仅保存在本机，不会上传到 OpenNote 服务器。Cookie 仅用于请求 B 站官方 API。",
+    aboutCookieTitle: "Cookie 用途",
+    aboutCookie:
+      "可选的 SESSDATA 用于拉取需登录或 AI 字幕；YouTube 无需 Cookie。",
     version: "版本",
+    previewExpand: "展开预览",
+    previewCollapse: "收起预览",
     updaterStatus: "自动更新",
     updaterStatusIdle: "尚未检查",
     updaterStatusChecking: "正在检查更新…",
@@ -132,9 +166,10 @@ const messages = {
   },
   en: {
     appTitle: "OpenNote",
-    navWorkspace: "Notes",
+    navWorkspace: "Generate notes",
     navSettings: "Settings",
     navAbout: "About",
+    navAriaLabel: "Main",
     setupTitle: "Initial setup",
     setupSubtitle:
       "Configure your OpenAI-compatible endpoint and language. Secrets stay on disk and are never shown in the UI.",
@@ -165,7 +200,10 @@ const messages = {
     clearApiKeyConfirm:
       "Clear the saved API key? You'll need to enter it again before generating notes.",
     clearCookie: "Clear cookie",
+    clearCookieConfirm:
+      "Clear the saved Bilibili cookie? Some videos may no longer provide captions.",
     cookieCleared: "Cookie cleared",
+    bilibiliCookieHowTo: "How do I get SESSDATA?",
     notesSaveDir: "Notes save location",
     notesSaveDirHint:
       "Optional. When set, generated notes are saved as Markdown files in this folder. Leave empty to keep notes in-app only.",
@@ -177,26 +215,58 @@ const messages = {
     bilibiliUrl: "Video URL",
     bilibiliUrlPlaceholder:
       "https://www.bilibili.com/video/BV… or https://www.youtube.com/watch?v=…",
+    bilibiliUrlHint: "For multi-part Bilibili videos, add ?p=2 to pick a part.",
+    workspaceEmptyHint:
+      "Paste a Bilibili or YouTube link to generate study notes. The video needs online captions (including AI captions). Long videos may take a few minutes.",
+    workspaceEmptyCookieHint:
+      "Some Bilibili videos need a SESSDATA cookie before captions can be fetched.",
+    openSettings: "Open settings",
+    retryGenerate: "Retry",
     generate: "Generate notes",
     generating: "Generating…",
     cancel: "Cancel",
     cancelRequested: "Cancel requested",
     cancelRequestedHint:
       "The background task may still be running; blocked HTTP calls can stop with a short delay.",
+    progressEtaHint: "Long videos may take a few minutes — hang tight.",
+    progressPercent: "{percent}%",
+    videoPreviewLoading: "Looking up video…",
+    videoPreviewDuration: "Duration {duration}",
+    videoPreviewPart: "Part {p} / {total}",
+    videoPreviewSubtitlesYes: "Caption track found",
+    videoPreviewSubtitlesNo: "No caption track found",
+    videoPreviewAuthRequired: "A Bilibili cookie may be required for captions",
+    saveDirGuide:
+      "Notes are ready. Set a save folder in Settings to auto-save Markdown next time.",
+    saveDirGuideDismiss: "Got it",
+    unsavedSettingsConfirm: "Settings are unsaved. Leave and discard changes?",
     copyMarkdown: "Copy Markdown",
     exportMarkdown: "Save as .md",
+    revealInFolder: "Show in folder",
+    revealFailed: "Could not open the folder. Open the save path manually.",
     copied: "Copied to clipboard",
     copyFailed: "Clipboard is unavailable. Select preview text to copy manually.",
     exportSaved: "Markdown file saved",
     exportCancelled: "Save cancelled",
     exportFailed: "Export failed",
     previewTitle: "Note preview",
+    segmentCount: "{count} subtitle segments",
     loading: "Loading…",
     loadSettingsFailed: "Failed to load settings.",
     aboutTitle: "About OpenNote",
     aboutDescription:
       "Desktop app that generates study notes from Bilibili / YouTube video subtitles.",
+    aboutPlatformsTitle: "Supported platforms",
+    aboutPlatforms: "Bilibili and YouTube (public captions).",
+    aboutPrivacyTitle: "Privacy",
+    aboutPrivacy:
+      "API keys and Bilibili cookies stay on this device. OpenNote does not upload them to its own servers. The cookie is sent only to Bilibili official APIs.",
+    aboutCookieTitle: "Cookie usage",
+    aboutCookie:
+      "Optional SESSDATA unlocks login-gated or AI captions on Bilibili. YouTube does not need a cookie.",
     version: "Version",
+    previewExpand: "Expand preview",
+    previewCollapse: "Collapse preview",
     updaterStatus: "Auto-update",
     updaterStatusIdle: "Not checked yet",
     updaterStatusChecking: "Checking for updates…",
@@ -305,4 +375,37 @@ export function progressStageLabel(
   };
   const key = map[stage];
   return key ? t(locale, key) : stage;
+}
+
+/** Approximate overall progress for wait-state UX (0–100). */
+export function progressPercent(stage: string, chunkIndex?: number, chunkCount?: number): number {
+  const stageStart: Record<string, number> = {
+    fetching_subtitles: 0,
+    chunking: 15,
+    calling_llm: 25,
+    merging: 85,
+    rendering: 92,
+    done: 100,
+    failed: 100,
+    cancelled: 100,
+  };
+  const stageSpan: Record<string, number> = {
+    fetching_subtitles: 15,
+    chunking: 10,
+    calling_llm: 60,
+    merging: 7,
+    rendering: 8,
+  };
+
+  const start = stageStart[stage];
+  if (start === undefined) {
+    return 0;
+  }
+
+  if (stage === "calling_llm" && chunkCount && chunkCount > 0) {
+    const index = Math.min(Math.max(chunkIndex ?? 0, 0), chunkCount - 1);
+    return Math.min(99, Math.round(start + (stageSpan.calling_llm * index) / chunkCount));
+  }
+
+  return start;
 }

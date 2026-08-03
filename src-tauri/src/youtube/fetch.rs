@@ -121,6 +121,80 @@ pub fn fetch_subtitles(input_url: &str) -> Result<YoutubeSubtitleResult> {
     })
 }
 
+/// Lightweight metadata + caption-track presence (no caption body download).
+pub fn preview_video(input_url: &str) -> Result<VideoPreview> {
+    let video_id = extract_video_id(input_url)?;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|err| YoutubeError::network(format!("failed to build HTTP client: {err}")))?;
+
+    let player = fetch_player(&client, &video_id)?;
+    let status = player
+        .playability_status
+        .as_ref()
+        .and_then(|s| s.status.as_deref())
+        .unwrap_or("");
+    if status == "ERROR" || status == "LOGIN_REQUIRED" {
+        let reason = player
+            .playability_status
+            .as_ref()
+            .and_then(|s| s.reason.clone())
+            .unwrap_or_else(|| status.to_string());
+        if status == "LOGIN_REQUIRED" {
+            return Err(YoutubeError::video_restricted(format!(
+                "YouTube requires login or restricts this video: {reason}"
+            )));
+        }
+        return Err(YoutubeError::video_not_found(format!(
+            "YouTube video unavailable: {reason}"
+        )));
+    }
+
+    let title = player
+        .video_details
+        .as_ref()
+        .and_then(|d| d.title.clone())
+        .filter(|t| !t.trim().is_empty())
+        .unwrap_or_else(|| video_id.clone());
+
+    let duration_ms = player
+        .video_details
+        .as_ref()
+        .and_then(|d| d.length_seconds.as_deref())
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(0)
+        .saturating_mul(1000);
+
+    let tracks = tracks_from_player(&player);
+    let has_subtitles = select_caption_track(&tracks).is_some();
+
+    Ok(VideoPreview {
+        title,
+        platform: "youtube",
+        video_id,
+        duration_ms,
+        p: 1,
+        page_count: 1,
+        part_title: None,
+        has_subtitles,
+        auth_required: false,
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct VideoPreview {
+    pub title: String,
+    pub platform: &'static str,
+    pub video_id: String,
+    pub duration_ms: u64,
+    pub p: u32,
+    pub page_count: u32,
+    pub part_title: Option<String>,
+    pub has_subtitles: bool,
+    pub auth_required: bool,
+}
+
 fn fetch_player(client: &reqwest::blocking::Client, video_id: &str) -> Result<PlayerResponse> {
     let url = format!("{PLAYER_ENDPOINT}?key={INNERTUBE_API_KEY}");
     let body = json!({

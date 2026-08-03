@@ -20,6 +20,7 @@ interface ConfigFormProps {
   locale: UiLocale;
   initialSettings: SettingsView;
   onSettingsSaved: (settings: SettingsView) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function ConfigForm({
@@ -27,6 +28,7 @@ export function ConfigForm({
   locale,
   initialSettings,
   onSettingsSaved,
+  onDirtyChange,
 }: ConfigFormProps) {
   const [baseUrl, setBaseUrl] = useState(initialSettings.base_url);
   const [model, setModel] = useState(initialSettings.model);
@@ -49,6 +51,11 @@ export function ConfigForm({
   const [apiKeyMessage, setApiKeyMessage] = useState<string | null>(null);
   const [notesDirMessage, setNotesDirMessage] = useState<string | null>(null);
   const [clearingNotesDir, setClearingNotesDir] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     void getAuthStatus()
@@ -83,6 +90,7 @@ export function ConfigForm({
 
   /** Clear stale “saved / tested” feedback once the form is dirty again. */
   function markDirty() {
+    setDirty(true);
     setSuccess(false);
     setCookieMessage(null);
     setApiKeyMessage(null);
@@ -92,6 +100,10 @@ export function ConfigForm({
   function markConnectionDirty() {
     markDirty();
     setTestSuccess(null);
+  }
+
+  function markClean() {
+    setDirty(false);
   }
 
   async function handleTestConnection() {
@@ -142,6 +154,10 @@ export function ConfigForm({
   }
 
   async function handleClearCookie() {
+    if (!window.confirm(t(locale, "clearCookieConfirm"))) {
+      return;
+    }
+
     setCookieMessage(null);
     setApiKeyMessage(null);
     setNotesDirMessage(null);
@@ -199,6 +215,14 @@ export function ConfigForm({
       });
       setNotesSaveDir(null);
       setNotesDirMessage(t(locale, "notesSaveDirCleared"));
+      // Path clear is persisted immediately; keep dirty only for other unsaved edits.
+      const stillDirty =
+        baseUrl !== initialSettings.base_url ||
+        model !== initialSettings.model ||
+        settingsLocale !== initialSettings.locale ||
+        apiKey.trim().length > 0 ||
+        bilibiliCookie.trim().length > 0;
+      setDirty(stillDirty);
       onSettingsSaved(settings);
     } catch (err) {
       showError(err as AppErrorPayload);
@@ -259,6 +283,7 @@ export function ConfigForm({
         setBilibiliCookie("");
         setNotesSaveDir(settings.notes_save_dir);
         setSuccess(true);
+        markClean();
         onSettingsSaved(settings);
       } catch (err) {
         if (authSaved) {
@@ -295,6 +320,7 @@ export function ConfigForm({
         <span>{t(locale, "baseUrl")}</span>
         <input
           type="url"
+          name="base_url"
           value={baseUrl}
           onChange={(event) => {
             markConnectionDirty();
@@ -303,6 +329,7 @@ export function ConfigForm({
           placeholder="https://api.openai.com/v1"
           required
           autoComplete="off"
+          spellCheck={false}
         />
       </label>
 
@@ -310,6 +337,7 @@ export function ConfigForm({
         <span>{t(locale, "model")}</span>
         <input
           type="text"
+          name="model"
           value={model}
           onChange={(event) => {
             markConnectionDirty();
@@ -318,6 +346,7 @@ export function ConfigForm({
           placeholder="deepseek-v4-flash"
           required
           autoComplete="off"
+          spellCheck={false}
         />
       </label>
 
@@ -325,6 +354,7 @@ export function ConfigForm({
         <span>{t(locale, "apiKey")}</span>
         <input
           type="password"
+          name="api_key"
           value={apiKey}
           onChange={(event) => {
             markConnectionDirty();
@@ -334,6 +364,7 @@ export function ConfigForm({
             authStatus?.has_api_key ? t(locale, "apiKeySaved") : ""
           }
           autoComplete="off"
+          spellCheck={false}
         />
       </label>
 
@@ -371,6 +402,7 @@ export function ConfigForm({
         <span>{t(locale, "bilibiliCookie")}</span>
         <input
           type="password"
+          name="bilibili_cookie"
           value={bilibiliCookie}
           onChange={(event) => {
             markDirty();
@@ -382,8 +414,12 @@ export function ConfigForm({
               : t(locale, "bilibiliCookiePlaceholder")
           }
           autoComplete="off"
+          spellCheck={false}
         />
-        <span className="muted-inline">{t(locale, "bilibiliCookieHint")}</span>
+        <details className="cookie-hint">
+          <summary>{t(locale, "bilibiliCookieHowTo")}</summary>
+          <span className="muted-inline">{t(locale, "bilibiliCookieHint")}</span>
+        </details>
       </label>
 
       {mode === "settings" && authStatus?.has_bilibili_cookie ? (
@@ -405,6 +441,7 @@ export function ConfigForm({
       <label>
         <span>{t(locale, "locale")}</span>
         <select
+          name="locale"
           value={settingsLocale}
           onChange={(event) => {
             markDirty();
@@ -423,10 +460,12 @@ export function ConfigForm({
             <span>{t(locale, "notesSaveDir")}</span>
             <input
               type="text"
+              name="notes_save_dir"
               value={notesSaveDir ?? ""}
               readOnly
               placeholder={t(locale, "notesSaveDirPlaceholder")}
               autoComplete="off"
+              spellCheck={false}
             />
             <span className="muted-inline">{t(locale, "notesSaveDirHint")}</span>
           </label>

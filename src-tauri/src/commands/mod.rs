@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::auth::{
@@ -12,6 +13,7 @@ use crate::job::{
     JobStatusResponse, StartJobResponse,
 };
 use crate::llm::{LlmClient, LlmClientConfig, ReqwestTransport};
+use crate::media::{self, VideoPreview};
 use crate::note::sanitize_markdown_filename;
 use crate::paths::StoragePaths;
 use crate::redact::REDACTED;
@@ -69,6 +71,100 @@ pub async fn pick_notes_save_dir(app: tauri::AppHandle) -> CommandResult<Option<
 }
 
 #[tauri::command]
+pub fn reveal_in_folder(
+    state: tauri::State<'_, AppState>,
+    path: String,
+) -> CommandResult<()> {
+    let canonical = prepare_reveal_path(&state.paths, &path)?;
+    reveal_path_in_folder(&canonical).map_err(|err| {
+        ErrorPayload::from(Error::storage(format!("Failed to open folder: {err}")))
+    })
+}
+
+fn prepare_reveal_path(paths: &StoragePaths, path: &str) -> CommandResult<PathBuf> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(ErrorPayload::from(Error::validation("path is required")));
+    }
+
+    let path = PathBuf::from(trimmed);
+    if !path.is_absolute() {
+        return Err(ErrorPayload::from(Error::validation(
+            "path must be absolute",
+        )));
+    }
+    if !path.exists() {
+        return Err(ErrorPayload::from(Error::storage(
+            "Path does not exist".to_string(),
+        )));
+    }
+
+    let settings = load_settings(paths).map_err(ErrorPayload::from)?;
+    let notes_dir = settings.notes_save_dir.ok_or_else(|| {
+        ErrorPayload::from(Error::validation(
+            "notes_save_dir is not configured",
+        ))
+    })?;
+    let notes_dir = PathBuf::from(notes_dir);
+    let canonical_file = path.canonicalize().map_err(|err| {
+        ErrorPayload::from(Error::storage(format!("Failed to resolve path: {err}")))
+    })?;
+    let canonical_dir = notes_dir.canonicalize().map_err(|err| {
+        ErrorPayload::from(Error::storage(format!(
+            "Failed to resolve notes_save_dir: {err}"
+        )))
+    })?;
+    if !canonical_file.starts_with(&canonical_dir) {
+        return Err(ErrorPayload::from(Error::validation(
+            "path must be inside the configured notes save directory",
+        )));
+    }
+
+    Ok(canonical_file)
+}
+
+fn reveal_path_in_folder(path: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn()?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", path.to_string_lossy()))
+            .spawn()?;
+        Ok(())
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let target = if path.is_dir() {
+            path.to_path_buf()
+        } else {
+            path.parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_else(|| path.to_path_buf())
+        };
+        std::process::Command::new("xdg-open").arg(target).spawn()?;
+        Ok(())
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", unix)))]
+    {
+        let _ = path;
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "reveal_in_folder is not supported on this platform",
+        ))
+    }
+}
+
+#[tauri::command]
 pub fn get_auth_status(state: tauri::State<'_, AppState>) -> CommandResult<AuthStatus> {
     auth_status(&state.paths).map_err(ErrorPayload::from)
 }
@@ -98,6 +194,26 @@ pub async fn fetch_bilibili_subtitles(
     .map_err(|_| ErrorPayload {
         code: "NETWORK_ERROR",
         message: "Failed to complete subtitle fetch".to_string(),
+    })?
+}
+
+#[tauri::command]
+pub async fn preview_video(
+    state: tauri::State<'_, AppState>,
+    url: String,
+) -> CommandResult<VideoPreview> {
+    let paths = state.paths.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let cookie = load_auth(&paths)
+            .map_err(ErrorPayload::from)?
+            .and_then(|auth| auth.bilibili_cookie);
+        media::preview_video(&url, cookie.as_deref())
+    })
+    .await
+    .map_err(|_| ErrorPayload {
+        code: "NETWORK_ERROR",
+        message: "Failed to complete video preview".to_string(),
     })?
 }
 
@@ -383,5 +499,64 @@ mod test_llm_tests {
         .unwrap_err();
 
         assert_eq!(err.code, "VALIDATION_ERROR");
+    }
+}
+
+#[cfg(test)]
+mod reveal_tests {
+    use super::prepare_reveal_path;
+    use crate::paths::StoragePaths;
+    use crate::settings::{save_settings, Settings};
+    use std::fs;
+
+    fn paths_with_notes_dir() -> (tempfile::TempDir, StoragePaths, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let notes = dir.path().join("notes");
+        fs::create_dir_all(&notes).expect("notes dir");
+        let paths = StoragePaths::from_dirs(dir.path(), dir.path());
+        let mut settings = Settings::default();
+        settings.onboarding_completed = true;
+        settings.notes_save_dir = Some(notes.to_string_lossy().into_owned());
+        save_settings(&paths, &settings).expect("save settings");
+        (dir, paths, notes)
+    }
+
+    #[test]
+    fn reveal_in_folder_rejects_empty_path() {
+        let (_dir, paths, _) = paths_with_notes_dir();
+        let err = prepare_reveal_path(&paths, "   ").unwrap_err();
+        assert_eq!(err.code, "VALIDATION_ERROR");
+    }
+
+    #[test]
+    fn reveal_in_folder_rejects_relative_path() {
+        let (_dir, paths, _) = paths_with_notes_dir();
+        let err = prepare_reveal_path(&paths, "relative/notes.md").unwrap_err();
+        assert_eq!(err.code, "VALIDATION_ERROR");
+    }
+
+    #[test]
+    fn reveal_in_folder_rejects_missing_path() {
+        let (_dir, paths, notes) = paths_with_notes_dir();
+        let missing = notes.join("missing.md");
+        let err = prepare_reveal_path(&paths, &missing.to_string_lossy()).unwrap_err();
+        assert_eq!(err.code, "STORAGE_ERROR");
+    }
+
+    #[test]
+    fn reveal_in_folder_rejects_path_outside_notes_dir() {
+        let (_dir, paths, _notes) = paths_with_notes_dir();
+        let outside = tempfile::NamedTempFile::new().expect("temp file");
+        let err = prepare_reveal_path(&paths, &outside.path().to_string_lossy()).unwrap_err();
+        assert_eq!(err.code, "VALIDATION_ERROR");
+    }
+
+    #[test]
+    fn reveal_in_folder_accepts_path_inside_notes_dir() {
+        let (_dir, paths, notes) = paths_with_notes_dir();
+        let file = notes.join("note.md");
+        fs::write(&file, b"# hi").expect("write");
+        let resolved = prepare_reveal_path(&paths, &file.to_string_lossy()).expect("ok");
+        assert_eq!(resolved, file.canonicalize().expect("canon"));
     }
 }

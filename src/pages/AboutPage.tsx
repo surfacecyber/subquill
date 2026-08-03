@@ -36,7 +36,7 @@ export function AboutPage({ locale, updater }: AboutPageProps) {
       <dl className="about-meta">
         <div className="about-row">
           <dt>{t(locale, "appTitle")}</dt>
-          <dd>OpenNote</dd>
+          <dd translate="no">OpenNote</dd>
         </div>
         <div className="about-row">
           <dt>{t(locale, "version")}</dt>
@@ -47,6 +47,21 @@ export function AboutPage({ locale, updater }: AboutPageProps) {
           <dd aria-live="polite">{updaterStatusLabel(locale, state)}</dd>
         </div>
       </dl>
+
+      <div className="about-sections">
+        <section className="about-section" aria-labelledby="about-platforms">
+          <h2 id="about-platforms">{t(locale, "aboutPlatformsTitle")}</h2>
+          <p className="muted">{t(locale, "aboutPlatforms")}</p>
+        </section>
+        <section className="about-section" aria-labelledby="about-privacy">
+          <h2 id="about-privacy">{t(locale, "aboutPrivacyTitle")}</h2>
+          <p className="muted">{t(locale, "aboutPrivacy")}</p>
+        </section>
+        <section className="about-section" aria-labelledby="about-cookie">
+          <h2 id="about-cookie">{t(locale, "aboutCookieTitle")}</h2>
+          <p className="muted">{t(locale, "aboutCookie")}</p>
+        </section>
+      </div>
 
       <div className="about-actions">
         <button

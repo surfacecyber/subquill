@@ -17,6 +17,19 @@ export interface BilibiliSubtitleResult {
   segments: SubtitleSegment[];
 }
 
+/** Lightweight metadata from `preview_video` (no subtitle body). */
+export interface VideoPreview {
+  title: string;
+  platform: string;
+  video_id: string;
+  duration_ms: number;
+  p: number;
+  page_count: number;
+  part_title?: string | null;
+  has_subtitles: boolean;
+  auth_required: boolean;
+}
+
 export type BilibiliErrorCode =
   | "VALIDATION_ERROR"
   | "SHORT_LINK_FAILED"

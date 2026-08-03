@@ -1,5 +1,5 @@
 import type { UiLocale } from "../i18n";
-import { progressStageLabel, t } from "../i18n";
+import { progressPercent, progressStageLabel, t } from "../i18n";
 import type { JobProgress } from "../types/job";
 
 interface JobProgressDisplayProps {
@@ -25,16 +25,52 @@ export function JobProgressDisplay({
           total: progress.chunk_count,
         })
       : null;
+  const percent = progressPercent(
+    progress.stage,
+    progress.chunk_index,
+    progress.chunk_count,
+  );
+  const isBusy =
+    progress.stage !== "done" &&
+    progress.stage !== "failed" &&
+    progress.stage !== "cancelled";
 
   return (
     <div
       className="job-progress"
       role="status"
       aria-live="polite"
-      aria-busy={progress.stage !== "done" && progress.stage !== "failed" && progress.stage !== "cancelled"}
+      aria-busy={isBusy}
     >
-      <p className="job-progress-stage">{stageLabel}</p>
+      <div className="job-progress-header">
+        <p className="job-progress-stage">{stageLabel}</p>
+        {isBusy ? (
+          <p className="job-progress-percent">
+            {t(locale, "progressPercent", { percent })}
+          </p>
+        ) : null}
+      </div>
+      {isBusy ? (
+        <div
+          className="job-progress-bar"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          aria-label={stageLabel}
+        >
+          <div
+            className="job-progress-bar-fill"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      ) : null}
       {chunkLabel ? <p className="job-progress-chunk">{chunkLabel}</p> : null}
+      {isBusy ? (
+        <p className="job-progress-eta muted-inline">
+          {t(locale, "progressEtaHint")}
+        </p>
+      ) : null}
       {cancelRequested ? (
         <p className="job-progress-cancel">
           {t(locale, "cancelRequested")}

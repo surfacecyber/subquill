@@ -7,10 +7,29 @@ use super::subtitle::{
 use super::types::BilibiliSubtitleResult;
 use super::url::{is_short_link_host, parse_video_url, resolve_short_link};
 use super::view::fetch_view;
+use serde::Serialize;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct VideoPreview {
+    pub title: String,
+    pub platform: &'static str,
+    pub video_id: String,
+    pub duration_ms: u64,
+    pub p: u32,
+    pub page_count: u32,
+    pub part_title: Option<String>,
+    pub has_subtitles: bool,
+    pub auth_required: bool,
+}
 
 pub fn fetch_subtitles(input_url: &str, cookie: Option<&str>) -> Result<BilibiliSubtitleResult> {
     let transport = ReqwestTransport::new(cookie.map(str::to_string))?;
     fetch_subtitles_with_transport(&transport, input_url)
+}
+
+pub fn preview_video(input_url: &str, cookie: Option<&str>) -> Result<VideoPreview> {
+    let transport = ReqwestTransport::new(cookie.map(str::to_string))?;
+    preview_video_with_transport(&transport, input_url)
 }
 
 pub fn fetch_subtitles_with_transport(
@@ -57,6 +76,41 @@ pub fn fetch_subtitles_with_transport(
     Err(last_error.unwrap_or_else(|| {
         BilibiliError::no_subtitle("failed to fetch usable subtitles")
     }))
+}
+
+/// Lightweight metadata + subtitle-track presence (no subtitle body download).
+pub fn preview_video_with_transport(
+    transport: &dyn HttpTransport,
+    input_url: &str,
+) -> Result<VideoPreview> {
+    let resolved_url = resolve_input_url(transport, input_url.trim())?;
+    let video_ref = parse_video_url(&resolved_url)?;
+    let (view, selected) = fetch_view(transport, &video_ref)?;
+
+    let mut has_subtitles = false;
+    let mut auth_required = false;
+    match fetch_subtitle_tracks(transport, &view.bvid, selected.cid) {
+        Ok(tracks) => {
+            has_subtitles = !tracks.is_empty();
+        }
+        Err(err) => match err.code() {
+            "AUTH_REQUIRED" => auth_required = true,
+            "NO_SUBTITLE" => {}
+            _ => return Err(err),
+        },
+    }
+
+    Ok(VideoPreview {
+        title: view.title,
+        platform: "bilibili",
+        video_id: view.bvid,
+        duration_ms: selected.duration_secs.saturating_mul(1000),
+        p: selected.p,
+        page_count: selected.page_count,
+        part_title: selected.part_title,
+        has_subtitles,
+        auth_required,
+    })
 }
 
 fn fetch_validated_segments(
@@ -270,5 +324,63 @@ mod tests {
         let result = fetch_subtitles_with_transport(&transport, "https://b23.tv/abc").unwrap();
         assert_eq!(result.bvid, "BV1xx411c7mD");
         assert!(!transport.requests()[0].send_cookie);
+    }
+
+    #[test]
+    fn preview_video_reports_metadata_without_subtitle_download() {
+        let transport = MockTransport::new(vec![
+            (
+                "https://api.bilibili.com/x/web-interface/view?bvid=BV1xx411c7mD&p=2",
+                MockResponse::success(
+                    r#"{
+                        "code": 0,
+                        "data": {
+                            "bvid": "BV1xx411c7mD",
+                            "aid": 170001,
+                            "title": "Main Title",
+                            "pages": [
+                                {"cid": 1, "page": 1, "part": "Part 1", "duration": 5},
+                                {"cid": 2, "page": 2, "part": "Part 2", "duration": 90}
+                            ]
+                        }
+                    }"#,
+                ),
+            ),
+            (
+                "https://api.bilibili.com/x/player/wbi/v2?bvid=BV1xx411c7mD&cid=2",
+                MockResponse::success(
+                    r#"{
+                        "code": 0,
+                        "data": {
+                            "subtitle": {
+                                "subtitles": [
+                                    {
+                                        "lan": "zh-CN",
+                                        "subtitle_url": "//subtitle.bilibili.com/demo.json"
+                                    }
+                                ]
+                            }
+                        }
+                    }"#,
+                ),
+            ),
+        ]);
+
+        let preview = preview_video_with_transport(
+            &transport,
+            "https://www.bilibili.com/video/BV1xx411c7mD?p=2",
+        )
+        .unwrap();
+
+        assert_eq!(preview.title, "Main Title");
+        assert_eq!(preview.p, 2);
+        assert_eq!(preview.page_count, 2);
+        assert_eq!(preview.duration_ms, 90_000);
+        assert!(preview.has_subtitles);
+        assert!(!preview.auth_required);
+        assert!(!transport
+            .requests()
+            .iter()
+            .any(|request| request.url.contains("subtitle.bilibili.com")));
     }
 }

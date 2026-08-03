@@ -5,6 +5,8 @@ import type { UpdaterState } from "../updater/updaterState";
 interface UpdateBannerProps {
   locale: UiLocale;
   state: UpdaterState;
+  /** When true (e.g. note job running), hide the banner to reduce distraction. */
+  deferred?: boolean;
   onInstall: () => void;
   onDismiss: () => void;
 }
@@ -12,10 +14,11 @@ interface UpdateBannerProps {
 export function UpdateBanner({
   locale,
   state,
+  deferred = false,
   onInstall,
   onDismiss,
 }: UpdateBannerProps) {
-  if (state.phase !== "available" || !state.availableVersion) {
+  if (deferred || state.phase !== "available" || !state.availableVersion) {
     return null;
   }
 
