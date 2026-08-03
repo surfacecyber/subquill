@@ -47,6 +47,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::save_settings,
+            commands::pick_notes_save_dir,
             commands::get_auth_status,
             commands::save_auth,
             commands::fetch_bilibili_subtitles,

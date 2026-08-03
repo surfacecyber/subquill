@@ -88,6 +88,9 @@ pub struct JobResult {
     pub bvid: String,
     pub language: String,
     pub segment_count: usize,
+    /// Absolute path when auto-save succeeded; omitted when disabled or failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

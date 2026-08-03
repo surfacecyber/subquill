@@ -23,6 +23,7 @@ The dev server runs on port 1420. The Tauri window opens at about 960×700.
 - Main workspace: paste a Bilibili or YouTube URL, generate notes, track progress, cancel in-flight jobs
 - Safe Markdown preview (no raw HTML), copy to clipboard, export to `.md` via native save dialog
 - Settings: update configuration, test connection, explicitly clear saved Bilibili cookie
+- Optional notes save folder: auto-write generated Markdown into a chosen directory
 - About: app name, version, manual update checks with live status
 - Chinese and English UI (`zh` / `en` / follow system)
 

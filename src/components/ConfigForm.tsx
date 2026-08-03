@@ -1,7 +1,12 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
-import { getAuthStatus, saveAuth, saveSettings } from "../api/commands";
+import {
+  getAuthStatus,
+  pickNotesSaveDir,
+  saveAuth,
+  saveSettings,
+} from "../api/commands";
 import { testLlm } from "../api/job";
 import type { UiLocale } from "../i18n";
 import { t } from "../i18n";
@@ -27,6 +32,9 @@ export function ConfigForm({
   const [model, setModel] = useState(initialSettings.model);
   const [settingsLocale, setSettingsLocale] = useState<Locale>(
     initialSettings.locale,
+  );
+  const [notesSaveDir, setNotesSaveDir] = useState<string | null>(
+    initialSettings.notes_save_dir,
   );
   const [apiKey, setApiKey] = useState("");
   const [bilibiliCookie, setBilibiliCookie] = useState("");
@@ -119,6 +127,21 @@ export function ConfigForm({
     }
   }
 
+  async function handlePickNotesSaveDir() {
+    setError(null);
+    setErrorDetail(null);
+    markDirty();
+
+    try {
+      const picked = await pickNotesSaveDir();
+      if (picked) {
+        setNotesSaveDir(picked);
+      }
+    } catch (err) {
+      showError(err as AppErrorPayload);
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -157,12 +180,17 @@ export function ConfigForm({
           locale: settingsLocale,
           onboarding_completed:
             mode === "onboarding" ? true : initialSettings.onboarding_completed,
+          notes_save_dir:
+            mode === "settings"
+              ? notesSaveDir
+              : initialSettings.notes_save_dir,
         });
 
         const nextAuthStatus = await getAuthStatus();
         setAuthStatus(nextAuthStatus);
         setApiKey("");
         setBilibiliCookie("");
+        setNotesSaveDir(settings.notes_save_dir);
         setSuccess(true);
         onSettingsSaved(settings);
       } catch (err) {
@@ -283,6 +311,45 @@ export function ConfigForm({
           <option value="en">{t(locale, "localeEn")}</option>
         </select>
       </label>
+
+      {mode === "settings" ? (
+        <div className="notes-save-dir">
+          <label>
+            <span>{t(locale, "notesSaveDir")}</span>
+            <input
+              type="text"
+              value={notesSaveDir ?? ""}
+              readOnly
+              placeholder={t(locale, "notesSaveDirPlaceholder")}
+              autoComplete="off"
+            />
+            <span className="muted-inline">{t(locale, "notesSaveDirHint")}</span>
+          </label>
+          <div className="form-row">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void handlePickNotesSaveDir()}
+              disabled={saving}
+            >
+              {t(locale, "pickNotesSaveDir")}
+            </button>
+            {notesSaveDir ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  markDirty();
+                  setNotesSaveDir(null);
+                }}
+                disabled={saving}
+              >
+                {t(locale, "clearNotesSaveDir")}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="form-actions">
         <button

@@ -288,6 +288,7 @@ mod tests {
             bvid: "BVTEST".to_string(),
             language: "zh-CN".to_string(),
             segment_count: 1,
+            saved_path: None,
         }
     }
 

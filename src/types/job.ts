@@ -32,6 +32,8 @@ export interface JobResult {
   bvid: string;
   language: string;
   segment_count: number;
+  /** Absolute path when auto-save succeeded. */
+  saved_path?: string | null;
 }
 
 export interface StartJobResponse {

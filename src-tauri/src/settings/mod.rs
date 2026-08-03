@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -32,6 +34,9 @@ pub struct Settings {
     pub model: String,
     pub locale: Locale,
     pub onboarding_completed: bool,
+    /// Absolute path to auto-save generated notes. `None` disables auto-save.
+    #[serde(default)]
+    pub notes_save_dir: Option<String>,
 }
 
 impl Default for Settings {
@@ -42,6 +47,7 @@ impl Default for Settings {
             model: "deepseek-v4-flash".to_string(),
             locale: Locale::System,
             onboarding_completed: false,
+            notes_save_dir: None,
         }
     }
 }
@@ -52,6 +58,8 @@ pub struct SaveSettingsInput {
     pub model: String,
     pub locale: String,
     pub onboarding_completed: bool,
+    #[serde(default)]
+    pub notes_save_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -61,6 +69,7 @@ pub struct SettingsView {
     pub model: String,
     pub locale: String,
     pub onboarding_completed: bool,
+    pub notes_save_dir: Option<String>,
 }
 
 impl From<Settings> for SettingsView {
@@ -71,6 +80,7 @@ impl From<Settings> for SettingsView {
             model: value.model,
             locale: locale_to_string(&value.locale),
             onboarding_completed: value.onboarding_completed,
+            notes_save_dir: value.notes_save_dir,
         }
     }
 }
@@ -147,6 +157,37 @@ pub fn validate_model(model: &str) -> Result<String> {
     Ok(trimmed.to_string())
 }
 
+/// Validates an optional notes auto-save directory.
+/// Empty / whitespace clears the setting. Otherwise the path must be absolute and exist as a directory.
+pub fn validate_notes_save_dir(value: Option<String>) -> Result<Option<String>> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    let path = PathBuf::from(trimmed);
+    if !path.is_absolute() {
+        return Err(Error::validation(
+            "notes_save_dir must be an absolute path",
+        ));
+    }
+    if !Path::new(&path).is_dir() {
+        return Err(Error::validation(
+            "notes_save_dir must be an existing directory",
+        ));
+    }
+
+    let normalized = path
+        .canonicalize()
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned();
+    Ok(Some(normalized))
+}
+
 pub fn validate_settings_input(input: SaveSettingsInput) -> Result<Settings> {
     Ok(Settings {
         version: SETTINGS_VERSION,
@@ -154,6 +195,7 @@ pub fn validate_settings_input(input: SaveSettingsInput) -> Result<Settings> {
         model: validate_model(&input.model)?,
         locale: Locale::parse(&input.locale)?,
         onboarding_completed: input.onboarding_completed,
+        notes_save_dir: validate_notes_save_dir(input.notes_save_dir)?,
     })
 }
 
@@ -245,11 +287,15 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let paths = StoragePaths::from_dirs(dir.path().join("auth"), dir.path());
 
+        let notes_dir = dir.path().join("notes");
+        std::fs::create_dir_all(&notes_dir).expect("mkdir notes");
+
         let input = SaveSettingsInput {
             base_url: "https://api.example.com/v1".to_string(),
             model: "test-model".to_string(),
             locale: "zh".to_string(),
             onboarding_completed: true,
+            notes_save_dir: Some(notes_dir.to_string_lossy().into_owned()),
         };
 
         let settings = validate_settings_input(input).expect("validate");
@@ -257,6 +303,53 @@ mod tests {
         let loaded = load_settings(&paths).expect("load");
 
         assert_eq!(loaded, settings);
+        assert!(loaded.notes_save_dir.is_some());
+    }
+
+    #[test]
+    fn notes_save_dir_empty_clears_setting() {
+        let validated = validate_notes_save_dir(Some("   ".to_string())).expect("validate");
+        assert_eq!(validated, None);
+    }
+
+    #[test]
+    fn notes_save_dir_rejects_relative_path() {
+        let err = validate_notes_save_dir(Some("relative/notes".to_string())).unwrap_err();
+        assert_eq!(err.code(), "VALIDATION_ERROR");
+    }
+
+    #[test]
+    fn notes_save_dir_rejects_missing_directory() {
+        let missing = tempfile::tempdir()
+            .expect("tempdir")
+            .path()
+            .join("does-not-exist");
+        let err =
+            validate_notes_save_dir(Some(missing.to_string_lossy().into_owned())).unwrap_err();
+        assert_eq!(err.code(), "VALIDATION_ERROR");
+    }
+
+    #[test]
+    fn load_settings_accepts_legacy_json_without_notes_save_dir() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = StoragePaths::from_dirs(dir.path().join("auth"), dir.path());
+        let file = paths.settings_file();
+        std::fs::create_dir_all(file.parent().expect("parent")).expect("mkdir");
+        std::fs::write(
+            &file,
+            r#"{
+              "version": 1,
+              "base_url": "https://api.openai.com/v1",
+              "model": "deepseek-v4-flash",
+              "locale": "system",
+              "onboarding_completed": true
+            }"#,
+        )
+        .expect("write");
+
+        let loaded = load_settings(&paths).expect("load");
+        assert!(loaded.onboarding_completed);
+        assert_eq!(loaded.notes_save_dir, None);
     }
 
     #[test]

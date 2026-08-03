@@ -28,3 +28,6 @@ src-tauri/target/
 
 # Generated release config (contains updater pubkey + endpoint)
 .release/
+
+# GitNexus local index (binary graph DB + caches; regenerate with `npx gitnexus analyze`)
+.gitnexus/

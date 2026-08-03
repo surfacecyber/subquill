@@ -304,6 +304,16 @@ html {
   gap: 10px;
 }
 
+.notes-save-dir {
+  display: grid;
+  gap: 10px;
+}
+
+.notes-save-dir input[readonly] {
+  color: var(--color-muted);
+  cursor: default;
+}
+
 .form-error {
   margin: 0;
   color: var(--color-error);
