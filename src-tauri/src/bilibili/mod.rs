@@ -9,7 +9,7 @@ mod types;
 mod url;
 mod view;
 
-pub use service::fetch_subtitles;
+pub use service::{fetch_subtitles, preview_video, VideoPreview};
 pub use types::{BilibiliSubtitleResult, SubtitleSegment};
 
 #[cfg(test)]

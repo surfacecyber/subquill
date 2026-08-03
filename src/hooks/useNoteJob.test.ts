@@ -21,6 +21,10 @@ import {
 describe("useNoteJob listener cleanup", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    vi.mocked(startNoteJob).mockReset();
+    vi.mocked(listenJobProgress).mockReset();
+    vi.mocked(getJobStatus).mockReset();
+    vi.mocked(getJobResult).mockReset();
   });
 
   it("unlistens when reset is called", async () => {
@@ -146,5 +150,57 @@ describe("useNoteJob listener cleanup", () => {
 
     expect(result.current.jobId).toBe("job-1");
     expect(startNoteJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a new start after a previous job reaches a terminal state", async () => {
+    const unlisten = vi.fn();
+    let progressHandler:
+      | ((event: {
+          job_id: string;
+          stage: "failed" | "calling_llm";
+          error_code?: string;
+        }) => void)
+      | null = null;
+
+    vi.mocked(listenJobProgress).mockImplementation(async (handler) => {
+      progressHandler = handler;
+      return unlisten;
+    });
+    vi.mocked(startNoteJob)
+      .mockResolvedValueOnce({ job_id: "job-1" })
+      .mockResolvedValueOnce({ job_id: "job-2" });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-1",
+      status: "running",
+      progress: { job_id: "job-1", stage: "calling_llm" },
+    });
+
+    const { result } = renderHook(() => useNoteJob());
+
+    await act(async () => {
+      await result.current.start("https://example.com/one");
+    });
+
+    expect(result.current.jobId).toBe("job-1");
+    expect(result.current.isActive).toBe(true);
+
+    await act(async () => {
+      progressHandler?.({
+        job_id: "job-1",
+        stage: "failed",
+        error_code: "NETWORK_ERROR",
+      });
+      await Promise.resolve();
+    });
+
+    expect(result.current.isActive).toBe(false);
+    expect(result.current.error?.code).toBe("NETWORK_ERROR");
+
+    await act(async () => {
+      await result.current.start("https://example.com/two");
+    });
+
+    expect(startNoteJob).toHaveBeenCalledTimes(2);
+    expect(result.current.jobId).toBe("job-2");
   });
 });

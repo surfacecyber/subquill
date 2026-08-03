@@ -7,12 +7,14 @@ interface SettingsPageProps {
   locale: UiLocale;
   settings: SettingsView;
   onSettingsSaved: (settings: SettingsView) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function SettingsPage({
   locale,
   settings,
   onSettingsSaved,
+  onDirtyChange,
 }: SettingsPageProps) {
   return (
     <section className="settings-page" aria-labelledby="settings-heading">
@@ -26,6 +28,7 @@ export function SettingsPage({
         locale={locale}
         initialSettings={settings}
         onSettingsSaved={onSettingsSaved}
+        onDirtyChange={onDirtyChange}
       />
     </section>
   );

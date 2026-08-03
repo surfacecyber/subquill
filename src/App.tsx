@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getSettings } from "./api/commands";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -18,6 +18,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [view, setView] = useState<AppView>("workspace");
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [jobActive, setJobActive] = useState(false);
 
   useEffect(() => {
     void getSettings()
@@ -32,6 +34,24 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = uiLocale === "zh" ? "zh-CN" : "en";
   }, [uiLocale]);
+
+  const navigate = useCallback(
+    (next: AppView) => {
+      if (view === "settings" && next !== "settings" && settingsDirty) {
+        if (!window.confirm(t(uiLocale, "unsavedSettingsConfirm"))) {
+          return;
+        }
+        setSettingsDirty(false);
+      }
+      setView(next);
+    },
+    [view, settingsDirty, uiLocale],
+  );
+
+  const handleSettingsSaved = useCallback((next: SettingsView) => {
+    setSettings(next);
+    setSettingsDirty(false);
+  }, []);
 
   if (loading) {
     return (
@@ -66,14 +86,15 @@ function App() {
   return (
     <div className="app-layout">
       <div className="titlebar-drag" data-tauri-drag-region aria-hidden="true" />
-      <nav className="app-nav" aria-label="Main">
+      <nav className="app-nav" aria-label={t(uiLocale, "navAriaLabel")}>
         <p className="nav-brand">{t(uiLocale, "appTitle")}</p>
         <ul className="nav-list">
           <li>
             <button
               type="button"
               className={`nav-link${view === "workspace" ? " nav-link-active" : ""}`}
-              onClick={() => setView("workspace")}
+              aria-current={view === "workspace" ? "page" : undefined}
+              onClick={() => navigate("workspace")}
             >
               {t(uiLocale, "navWorkspace")}
             </button>
@@ -82,7 +103,8 @@ function App() {
             <button
               type="button"
               className={`nav-link${view === "settings" ? " nav-link-active" : ""}`}
-              onClick={() => setView("settings")}
+              aria-current={view === "settings" ? "page" : undefined}
+              onClick={() => navigate("settings")}
             >
               {t(uiLocale, "navSettings")}
             </button>
@@ -91,7 +113,8 @@ function App() {
             <button
               type="button"
               className={`nav-link${view === "about" ? " nav-link-active" : ""}`}
-              onClick={() => setView("about")}
+              aria-current={view === "about" ? "page" : undefined}
+              onClick={() => navigate("about")}
             >
               {t(uiLocale, "navAbout")}
             </button>
@@ -103,6 +126,7 @@ function App() {
         <UpdateBanner
           locale={uiLocale}
           state={updater.state}
+          deferred={jobActive}
           onInstall={() => {
             void updater.installUpdate();
           }}
@@ -114,13 +138,19 @@ function App() {
           aria-hidden={view !== "workspace"}
           {...(view !== "workspace" ? { inert: true } : {})}
         >
-          <WorkspacePage locale={uiLocale} />
+          <WorkspacePage
+            locale={uiLocale}
+            notesSaveDir={settings.notes_save_dir}
+            onOpenSettings={() => navigate("settings")}
+            onJobActiveChange={setJobActive}
+          />
         </div>
         {view === "settings" ? (
           <SettingsPage
             locale={uiLocale}
             settings={settings}
-            onSettingsSaved={setSettings}
+            onSettingsSaved={handleSettingsSaved}
+            onDirtyChange={setSettingsDirty}
           />
         ) : null}
         {view === "about" ? (

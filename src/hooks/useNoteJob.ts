@@ -198,7 +198,11 @@ export function useNoteJob() {
 
   const start = useCallback(
     async (url: string) => {
-      if (startInFlightRef.current || jobIdRef.current !== null) {
+      if (startInFlightRef.current) {
+        return;
+      }
+      // Block only while a non-terminal job is claimed; allow retry after failure/cancel/done.
+      if (jobIdRef.current !== null && !isTerminalRef.current) {
         return;
       }
 

@@ -7,7 +7,7 @@ import type {
   SaveSettingsInput,
   SettingsView,
 } from "../types/settings";
-import type { BilibiliSubtitleResult } from "../types/bilibili";
+import type { BilibiliSubtitleResult, VideoPreview } from "../types/bilibili";
 
 function toAppError(error: unknown): AppErrorPayload {
   if (
@@ -46,6 +46,22 @@ export async function saveSettings(
 export async function pickNotesSaveDir(): Promise<string | null> {
   try {
     return await invoke<string | null>("pick_notes_save_dir");
+  } catch (error) {
+    throw toAppError(error);
+  }
+}
+
+export async function revealInFolder(path: string): Promise<void> {
+  try {
+    await invoke<void>("reveal_in_folder", { path });
+  } catch (error) {
+    throw toAppError(error);
+  }
+}
+
+export async function previewVideo(url: string): Promise<VideoPreview> {
+  try {
+    return await invoke<VideoPreview>("preview_video", { url });
   } catch (error) {
     throw toAppError(error);
   }
