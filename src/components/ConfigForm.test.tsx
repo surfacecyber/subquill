@@ -228,6 +228,7 @@ describe("ConfigForm", () => {
     );
 
     expect(screen.getByText("Notes save location")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear location" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Choose folder" }));
 
     await waitFor(() => {
@@ -244,5 +245,82 @@ describe("ConfigForm", () => {
         }),
       );
     });
+  });
+
+  it("clears API key immediately after confirmation", async () => {
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveAuth).mockResolvedValue({
+      has_api_key: false,
+      has_bilibili_cookie: false,
+    });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const user = userEvent.setup();
+    render(
+      <ConfigForm
+        mode="settings"
+        locale="en"
+        initialSettings={{ ...baseSettings, onboarding_completed: true }}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    const clearButton = await screen.findByRole("button", {
+      name: "Clear API key",
+    });
+    await user.click(clearButton);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(saveAuth).toHaveBeenCalledWith({ clear_api_key: true });
+      expect(screen.getByText("API key cleared")).toBeInTheDocument();
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it("clears notes save location immediately without waiting for Save", async () => {
+    const onSettingsSaved = vi.fn();
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveSettings).mockResolvedValue({
+      ...baseSettings,
+      onboarding_completed: true,
+      notes_save_dir: null,
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ConfigForm
+        mode="settings"
+        locale="en"
+        initialSettings={{
+          ...baseSettings,
+          onboarding_completed: true,
+          notes_save_dir: "/tmp/opennote-notes",
+        }}
+        onSettingsSaved={onSettingsSaved}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Clear location" }));
+
+    await waitFor(() => {
+      expect(saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notes_save_dir: null,
+          base_url: baseSettings.base_url,
+          model: baseSettings.model,
+        }),
+      );
+      expect(onSettingsSaved).toHaveBeenCalled();
+      expect(screen.getByText("Save location cleared")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 });

@@ -28,6 +28,8 @@ export interface SaveAuthInput {
   bilibili_cookie?: string;
   /** Explicitly remove a saved Bilibili cookie. Omit to preserve existing value. */
   clear_bilibili_cookie?: boolean;
+  /** Explicitly remove a saved API key. Omit to preserve existing value. */
+  clear_api_key?: boolean;
 }
 
 export interface AppErrorPayload {

@@ -34,6 +34,8 @@ pub struct SaveAuthInput {
     pub bilibili_cookie: Option<String>,
     #[serde(default)]
     pub clear_bilibili_cookie: bool,
+    #[serde(default)]
+    pub clear_api_key: bool,
 }
 
 impl fmt::Debug for SaveAuthInput {
@@ -45,6 +47,7 @@ impl fmt::Debug for SaveAuthInput {
                 &self.bilibili_cookie.as_ref().map(|_| REDACTED),
             )
             .field("clear_bilibili_cookie", &self.clear_bilibili_cookie)
+            .field("clear_api_key", &self.clear_api_key)
             .finish()
     }
 }
@@ -130,6 +133,12 @@ pub fn load_auth(paths: &StoragePaths) -> Result<Option<AuthSecrets>> {
 }
 
 pub fn save_auth(paths: &StoragePaths, input: SaveAuthInput) -> Result<AuthStatus> {
+    if input.clear_api_key && normalize_optional_secret(input.api_key.clone()).is_some() {
+        return Err(Error::validation(
+            "cannot set api_key and clear_api_key together",
+        ));
+    }
+
     let existing = load_auth(paths)?;
 
     let bilibili_cookie = resolve_bilibili_cookie(
@@ -139,12 +148,31 @@ pub fn save_auth(paths: &StoragePaths, input: SaveAuthInput) -> Result<AuthStatu
             .and_then(|auth| auth.bilibili_cookie.clone()),
     )?;
 
-    let api_key = match normalize_optional_secret(input.api_key) {
-        Some(key) => validate_api_key(&key)?,
-        None => existing
-            .map(|auth| auth.api_key)
-            .ok_or_else(|| Error::validation("api_key is required"))?,
+    let api_key = if input.clear_api_key {
+        String::new()
+    } else {
+        match normalize_optional_secret(input.api_key) {
+            Some(key) => validate_api_key(&key)?,
+            None => existing
+                .as_ref()
+                .map(|auth| auth.api_key.clone())
+                .filter(|key| !key.trim().is_empty())
+                .ok_or_else(|| Error::validation("api_key is required"))?,
+        }
     };
+
+    if api_key.is_empty() && bilibili_cookie.is_none() {
+        let file = paths.auth_file();
+        if file.exists() {
+            std::fs::remove_file(&file).map_err(|err| {
+                Error::storage(format!("Failed to remove auth file: {err}"))
+            })?;
+        }
+        return Ok(AuthStatus {
+            has_api_key: false,
+            has_bilibili_cookie: false,
+        });
+    }
 
     let auth = AuthSecrets {
         version: AUTH_VERSION,
@@ -202,6 +230,7 @@ mod tests {
             api_key: Some("sk-secret-input".to_string()),
             bilibili_cookie: Some("cookie-value".to_string()),
             clear_bilibili_cookie: false,
+            clear_api_key: false,
         };
         let debug = format!("{input:?}");
         assert!(!debug.contains("sk-secret-input"));
@@ -233,6 +262,7 @@ mod tests {
                 api_key: Some("sk-test-key".to_string()),
                 bilibili_cookie: None,
                 clear_bilibili_cookie: false,
+                clear_api_key: false,
             },
         )
         .expect("initial save");
@@ -243,6 +273,7 @@ mod tests {
                 api_key: None,
                 bilibili_cookie: Some("SESSDATA=abc".to_string()),
                 clear_bilibili_cookie: false,
+                clear_api_key: false,
             },
         )
         .expect("update cookie");
@@ -265,6 +296,7 @@ mod tests {
                 api_key: Some("sk-test-key".to_string()),
                 bilibili_cookie: Some("SESSDATA=abc".to_string()),
                 clear_bilibili_cookie: false,
+                clear_api_key: false,
             },
         )
         .expect("initial save");
@@ -275,6 +307,7 @@ mod tests {
                 api_key: None,
                 bilibili_cookie: None,
                 clear_bilibili_cookie: true,
+                clear_api_key: false,
             },
         )
         .expect("clear cookie");
@@ -287,11 +320,81 @@ mod tests {
     }
 
     #[test]
+    fn save_auth_clear_api_key_removes_auth_when_no_cookie() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = StoragePaths::from_dirs(dir.path(), dir.path());
+
+        save_auth(
+            &paths,
+            SaveAuthInput {
+                api_key: Some("sk-test-key".to_string()),
+                bilibili_cookie: None,
+                clear_bilibili_cookie: false,
+                clear_api_key: false,
+            },
+        )
+        .expect("initial save");
+
+        let status = save_auth(
+            &paths,
+            SaveAuthInput {
+                api_key: None,
+                bilibili_cookie: None,
+                clear_bilibili_cookie: false,
+                clear_api_key: true,
+            },
+        )
+        .expect("clear api key");
+
+        assert!(!status.has_api_key);
+        assert!(!status.has_bilibili_cookie);
+        assert!(load_auth(&paths).expect("load").is_none());
+    }
+
+    #[test]
+    fn save_auth_clear_api_key_keeps_cookie() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = StoragePaths::from_dirs(dir.path(), dir.path());
+
+        save_auth(
+            &paths,
+            SaveAuthInput {
+                api_key: Some("sk-test-key".to_string()),
+                bilibili_cookie: Some("SESSDATA=abc".to_string()),
+                clear_bilibili_cookie: false,
+                clear_api_key: false,
+            },
+        )
+        .expect("initial save");
+
+        let status = save_auth(
+            &paths,
+            SaveAuthInput {
+                api_key: None,
+                bilibili_cookie: None,
+                clear_bilibili_cookie: false,
+                clear_api_key: true,
+            },
+        )
+        .expect("clear api key");
+
+        assert!(!status.has_api_key);
+        assert!(status.has_bilibili_cookie);
+        let stored = load_auth(&paths).expect("load").expect("exists");
+        assert!(stored.api_key.is_empty());
+        assert_eq!(
+            stored.bilibili_cookie.as_deref(),
+            Some("SESSDATA=abc")
+        );
+    }
+
+    #[test]
     fn save_auth_rejects_clear_and_set_together() {
         let input = SaveAuthInput {
             api_key: Some("sk-test".to_string()),
             bilibili_cookie: Some("SESSDATA=abc".to_string()),
             clear_bilibili_cookie: true,
+            clear_api_key: false,
         };
 
         let err = resolve_bilibili_cookie(&input, None).unwrap_err();
@@ -325,6 +428,7 @@ mod tests {
                 api_key: Some("sk-secret".to_string()),
                 bilibili_cookie: Some("SESSDATA=xyz".to_string()),
                 clear_bilibili_cookie: false,
+                clear_api_key: false,
             },
         )
         .expect("save");
@@ -354,6 +458,7 @@ mod tests {
                 api_key: Some("sk-new".to_string()),
                 bilibili_cookie: None,
                 clear_bilibili_cookie: false,
+                clear_api_key: false,
             },
         )
         .expect("save after quarantine");

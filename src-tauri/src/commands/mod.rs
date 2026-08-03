@@ -349,6 +349,7 @@ mod test_llm_tests {
                 api_key: Some("sk-saved".to_string()),
                 bilibili_cookie: None,
                 clear_bilibili_cookie: false,
+                clear_api_key: false,
             },
         )
         .expect("save");
