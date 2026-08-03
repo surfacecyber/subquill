@@ -8,13 +8,14 @@ vi.mock("../api/commands", () => ({
   getAuthStatus: vi.fn(),
   saveAuth: vi.fn(),
   saveSettings: vi.fn(),
+  pickNotesSaveDir: vi.fn(),
 }));
 
 vi.mock("../api/job", () => ({
   testLlm: vi.fn(),
 }));
 
-import { getAuthStatus, saveAuth, saveSettings } from "../api/commands";
+import { getAuthStatus, pickNotesSaveDir, saveAuth, saveSettings } from "../api/commands";
 import { testLlm } from "../api/job";
 
 const baseSettings = {
@@ -23,6 +24,7 @@ const baseSettings = {
   model: "deepseek-v4-flash",
   locale: "en" as const,
   onboarding_completed: false,
+  notes_save_dir: null,
 };
 
 describe("ConfigForm", () => {
@@ -196,6 +198,51 @@ describe("ConfigForm", () => {
       expect(saveAuth).toHaveBeenCalled();
       expect(screen.getByText(/Settings could not be saved/)).toBeInTheDocument();
       expect(screen.getByText(/Validation failed/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows notes save location controls in settings mode", async () => {
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(pickNotesSaveDir).mockResolvedValue("/tmp/opennote-notes");
+    vi.mocked(saveAuth).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveSettings).mockResolvedValue({
+      ...baseSettings,
+      onboarding_completed: true,
+      notes_save_dir: "/tmp/opennote-notes",
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ConfigForm
+        mode="settings"
+        locale="en"
+        initialSettings={{ ...baseSettings, onboarding_completed: true }}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Notes save location")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Choose folder" }));
+
+    await waitFor(() => {
+      expect(pickNotesSaveDir).toHaveBeenCalled();
+      expect(screen.getByDisplayValue("/tmp/opennote-notes")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notes_save_dir: "/tmp/opennote-notes",
+        }),
+      );
     });
   });
 });

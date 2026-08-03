@@ -12,6 +12,7 @@ use crate::job::{
     JobStatusResponse, StartJobResponse,
 };
 use crate::llm::{LlmClient, LlmClientConfig, ReqwestTransport};
+use crate::note::sanitize_markdown_filename;
 use crate::paths::StoragePaths;
 use crate::redact::REDACTED;
 use crate::settings::{
@@ -43,6 +44,28 @@ pub fn save_settings(
     let settings = validate_settings_input(input).map_err(ErrorPayload::from)?;
     persist_settings(&state.paths, &settings).map_err(ErrorPayload::from)?;
     Ok(SettingsView::from(settings))
+}
+
+#[tauri::command]
+pub async fn pick_notes_save_dir(app: tauri::AppHandle) -> CommandResult<Option<String>> {
+    let app_for_dialog = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = app_for_dialog.dialog().file().blocking_pick_folder();
+        match path {
+            Some(path) => {
+                let file_path = path.into_path().map_err(|err| {
+                    ErrorPayload::from(Error::validation(format!("Invalid folder path: {err}")))
+                })?;
+                Ok(Some(file_path.to_string_lossy().into_owned()))
+            }
+            None => Ok(None),
+        }
+    })
+    .await
+    .map_err(|_| ErrorPayload {
+        code: "INTERNAL_ERROR",
+        message: "Folder picker failed to complete".to_string(),
+    })?
 }
 
 #[tauri::command]
@@ -236,68 +259,6 @@ pub fn get_app_info(app: tauri::AppHandle) -> AppInfo {
     }
 }
 
-const FILENAME_MAX_CHARS: usize = 120;
-
-const WINDOWS_RESERVED_NAMES: &[&str] = &[
-    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
-    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-];
-
-fn is_path_forbidden_char(c: char) -> bool {
-    c.is_control() || matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
-}
-
-fn trim_filename_edges(name: &str) -> String {
-    name.trim()
-        .trim_end_matches(|c: char| c.is_whitespace() || c == '.')
-        .trim_start_matches(|c: char| c.is_whitespace())
-        .to_string()
-}
-
-fn truncate_filename_chars(name: &str, max_chars: usize) -> String {
-    if name.chars().count() <= max_chars {
-        return name.to_string();
-    }
-    trim_filename_edges(&name.chars().take(max_chars).collect::<String>())
-}
-
-fn is_windows_reserved_filename(name: &str) -> bool {
-    let stem = name.rsplit_once('.').map(|(stem, _)| stem).unwrap_or(name);
-    WINDOWS_RESERVED_NAMES
-        .iter()
-        .any(|reserved| stem.eq_ignore_ascii_case(reserved))
-}
-
-fn sanitize_markdown_filename(title: &str) -> String {
-    let mut base: String = title
-        .chars()
-        .map(|c| {
-            if is_path_forbidden_char(c) {
-                if c.is_whitespace() {
-                    '-'
-                } else {
-                    '_'
-                }
-            } else {
-                c
-            }
-        })
-        .collect();
-
-    base = trim_filename_edges(&base);
-    base = truncate_filename_chars(&base, FILENAME_MAX_CHARS);
-
-    if base.is_empty() {
-        base = "opennote".to_string();
-    }
-
-    if is_windows_reserved_filename(&base) {
-        base = format!("_{base}");
-    }
-
-    format!("{base}.md")
-}
-
 #[tauri::command]
 pub async fn export_job_markdown(
     app: tauri::AppHandle,
@@ -339,56 +300,6 @@ pub async fn export_job_markdown(
         code: "INTERNAL_ERROR",
         message: "Export task failed to complete".to_string(),
     })?
-}
-
-#[cfg(test)]
-mod export_tests {
-    use super::sanitize_markdown_filename;
-
-    #[test]
-    fn sanitize_empty_title_defaults_to_opennote() {
-        assert_eq!(sanitize_markdown_filename(""), "opennote.md");
-    }
-
-    #[test]
-    fn sanitize_replaces_unsafe_chars_and_adds_extension() {
-        assert_eq!(
-            sanitize_markdown_filename("Hello World!"),
-            "Hello World!.md"
-        );
-    }
-
-    #[test]
-    fn sanitize_preserves_chinese_title() {
-        assert_eq!(sanitize_markdown_filename("学习笔记"), "学习笔记.md");
-    }
-
-    #[test]
-    fn sanitize_preserves_emoji() {
-        assert_eq!(sanitize_markdown_filename("笔记🎬"), "笔记🎬.md");
-    }
-
-    #[test]
-    fn sanitize_prefixes_windows_reserved_name() {
-        assert_eq!(sanitize_markdown_filename("CON"), "_CON.md");
-        assert_eq!(sanitize_markdown_filename("com1"), "_com1.md");
-    }
-
-    #[test]
-    fn sanitize_replaces_path_traversal_chars() {
-        assert_eq!(
-            sanitize_markdown_filename("../../etc/passwd"),
-            ".._.._etc_passwd.md"
-        );
-    }
-
-    #[test]
-    fn sanitize_truncates_long_titles_by_unicode_chars() {
-        let long = "学".repeat(200);
-        let name = sanitize_markdown_filename(&long);
-        assert!(name.ends_with(".md"));
-        assert_eq!(name.chars().count(), 123);
-    }
 }
 
 #[cfg(test)]

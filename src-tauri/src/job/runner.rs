@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -11,7 +12,8 @@ use crate::error::ErrorPayload;
 use crate::llm::{HttpTransport, LlmClient, LlmClientConfig, ReqwestTransport};
 use crate::media;
 use crate::note::{
-    generate_note_data, render_markdown, NoteLocale, NoteProgress, NoteProgressStage, VideoMetadata,
+    generate_note_data, render_markdown, write_markdown_to_dir, NoteLocale, NoteProgress,
+    NoteProgressStage, VideoMetadata,
 };
 use crate::paths::StoragePaths;
 use crate::settings::{load_settings, Locale as SettingsLocale};
@@ -107,6 +109,7 @@ where
 
     let settings = load_settings(paths).map_err(ErrorPayload::from)?;
     let locale = resolve_note_locale(&settings.locale);
+    let notes_save_dir = settings.notes_save_dir.clone();
 
     let auth = load_auth(paths).map_err(ErrorPayload::from)?;
     let api_key = auth
@@ -145,7 +148,7 @@ where
     )
     .map_err(ErrorPayload::from)?;
 
-    run_pipeline_with_client(
+    let mut result = run_pipeline_with_client(
         &client,
         subtitle_result,
         locale,
@@ -153,7 +156,21 @@ where
         check_deadline,
         job_id,
         on_progress,
-    )
+    )?;
+
+    if let Some(dir) = notes_save_dir.as_deref() {
+        match write_markdown_to_dir(Path::new(dir), &result.title, &result.bvid, &result.markdown) {
+            Ok(path) => {
+                result.saved_path = Some(path.to_string_lossy().into_owned());
+            }
+            Err(err) => {
+                // Auto-save must not fail the completed generation.
+                eprintln!("OpenNote auto-save failed: {}", err.message());
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 pub(crate) fn run_pipeline_with_client<T, P>(
@@ -219,6 +236,7 @@ where
         bvid: metadata.bvid,
         language,
         segment_count,
+        saved_path: None,
     })
 }
 
@@ -313,6 +331,7 @@ mod tests {
             model: "test-model".to_string(),
             locale: SettingsLocale::En,
             onboarding_completed: true,
+            notes_save_dir: None,
         };
         save_settings(paths, &settings).expect("save settings");
     }

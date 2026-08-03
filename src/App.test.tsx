@@ -31,6 +31,7 @@ const completedSettings = {
   model: "deepseek-v4-flash",
   locale: "en" as const,
   onboarding_completed: true,
+  notes_save_dir: null,
 };
 
 describe("App view persistence", () => {

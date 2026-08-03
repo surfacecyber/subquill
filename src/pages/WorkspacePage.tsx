@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { exportJobMarkdown } from "../api/job";
 import { JobProgressDisplay } from "../components/JobProgressDisplay";
@@ -33,6 +33,12 @@ export function WorkspacePage({ locale }: WorkspacePageProps) {
     start,
     cancel,
   } = useNoteJob();
+
+  useEffect(() => {
+    if (result?.saved_path) {
+      setActionMessage(t(locale, "autoSaved", { path: result.saved_path }));
+    }
+  }, [result?.saved_path, locale]);
 
   async function handleGenerate() {
     setStartError(null);

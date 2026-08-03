@@ -35,6 +35,13 @@ const messages = {
     testConnectionModel: "模型",
     clearCookie: "清除 Cookie",
     cookieCleared: "Cookie 已清除",
+    notesSaveDir: "笔记保存位置",
+    notesSaveDirHint:
+      "可选。配置后，生成完成的笔记会自动保存为 Markdown 到该目录。留空则仅保存在应用内预览。",
+    notesSaveDirPlaceholder: "未设置（不自动保存）",
+    pickNotesSaveDir: "选择文件夹",
+    clearNotesSaveDir: "清除",
+    autoSaved: "已自动保存到 {path}",
     bilibiliUrl: "视频链接",
     bilibiliUrlPlaceholder:
       "https://www.bilibili.com/video/BV… 或 https://www.youtube.com/watch?v=…",
@@ -84,7 +91,8 @@ const messages = {
     progressCancelled: "已取消",
     progressChunk: "分块 {current} / {total}",
     settingsTitle: "设置",
-    settingsSubtitle: "更新接口配置与凭据。留空 API Key 表示保留已存密钥。",
+    settingsSubtitle:
+      "更新接口配置、凭据与笔记保存位置。留空 API Key 表示保留已存密钥。",
     errorGeneric: "操作失败，请检查后重试。",
     errorAuthSaveFailed: "凭据保存失败，设置尚未更新。",
     errorSettingsSaveFailed: "设置保存失败（凭据可能已更新）。",
@@ -149,6 +157,13 @@ const messages = {
     testConnectionModel: "Model",
     clearCookie: "Clear cookie",
     cookieCleared: "Cookie cleared",
+    notesSaveDir: "Notes save location",
+    notesSaveDirHint:
+      "Optional. When set, generated notes are saved as Markdown files in this folder. Leave empty to keep notes in-app only.",
+    notesSaveDirPlaceholder: "Not set (no auto-save)",
+    pickNotesSaveDir: "Choose folder",
+    clearNotesSaveDir: "Clear",
+    autoSaved: "Auto-saved to {path}",
     bilibiliUrl: "Video URL",
     bilibiliUrlPlaceholder:
       "https://www.bilibili.com/video/BV… or https://www.youtube.com/watch?v=…",
@@ -200,7 +215,7 @@ const messages = {
     progressChunk: "Chunk {current} / {total}",
     settingsTitle: "Settings",
     settingsSubtitle:
-      "Update endpoint settings and credentials. Leave API key empty to keep the saved key.",
+      "Update endpoint settings, credentials, and notes save location. Leave API key empty to keep the saved key.",
     errorGeneric: "Something went wrong. Check your input and try again.",
     errorAuthSaveFailed: "Credentials could not be saved. Settings were not updated.",
     errorSettingsSaveFailed:

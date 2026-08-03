@@ -43,6 +43,14 @@ export async function saveSettings(
   }
 }
 
+export async function pickNotesSaveDir(): Promise<string | null> {
+  try {
+    return await invoke<string | null>("pick_notes_save_dir");
+  } catch (error) {
+    throw toAppError(error);
+  }
+}
+
 export async function getAuthStatus(): Promise<AuthStatus> {
   try {
     return await invoke<AuthStatus>("get_auth_status");

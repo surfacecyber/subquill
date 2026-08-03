@@ -6,6 +6,8 @@ export interface SettingsView {
   model: string;
   locale: Locale;
   onboarding_completed: boolean;
+  /** Absolute path for auto-saving generated notes; null disables auto-save. */
+  notes_save_dir: string | null;
 }
 
 export interface SaveSettingsInput {
@@ -13,6 +15,7 @@ export interface SaveSettingsInput {
   model: string;
   locale: Locale;
   onboarding_completed: boolean;
+  notes_save_dir?: string | null;
 }
 
 export interface AuthStatus {
