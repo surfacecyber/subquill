@@ -389,14 +389,16 @@ impl JobManager {
                 Some(result) => Ok(attach_batch_results(result, job)),
                 None => Err(job_not_ready()),
             },
-            JobStatus::Failed => Err(job
-                .error
-                .clone()
-                .unwrap_or_else(|| internal_error("Failed job is missing error"))),
-            // Partial batch success may still have a primary note after cancel.
-            JobStatus::Cancelled => match job.result.clone() {
+            // Partial batch success may still have a primary note after fail/cancel.
+            JobStatus::Failed | JobStatus::Cancelled => match job.result.clone() {
                 Some(result) => Ok(attach_batch_results(result, job)),
-                None => Err(job.error.clone().unwrap_or_else(job_cancelled)),
+                None => Err(job.error.clone().unwrap_or_else(|| {
+                    if job.status == JobStatus::Cancelled {
+                        job_cancelled()
+                    } else {
+                        internal_error("Failed job is missing error")
+                    }
+                })),
             },
         }
     }
@@ -550,10 +552,8 @@ fn apply_terminal_failure(job: &mut JobRecord, error: ErrorPayload) -> TerminalT
     };
     job.progress = terminal_progress(job, stage, Some(error.code));
     job.error = Some(error);
-    // Keep any successful item results for UI/export of partial batch on cancel.
-    if job.status == JobStatus::Failed {
-        job.result = None;
-    }
+    // Keep any successful item results for UI/export of partial batch on
+    // cancel or failure (primary remains the last successful note).
 
     TerminalTransition {
         status: job.status,
@@ -934,5 +934,42 @@ mod tests {
             .get_result(&handle.job_id.to_string())
             .expect("partial result");
         assert_eq!(result.title, "Test");
+    }
+
+    #[test]
+    fn batch_fail_keeps_partial_successful_notes() {
+        let manager = JobManager::new();
+        let urls = vec![
+            "https://example.com/a".to_string(),
+            "https://example.com/b".to_string(),
+            "https://example.com/c".to_string(),
+        ];
+        let handle = manager.try_start(urls).expect("start");
+        manager.mark_running(handle.job_id).expect("running");
+        manager
+            .record_item_success(handle.job_id, 0, sample_result_named("A", "# A"))
+            .expect("ok 0");
+        manager
+            .record_item_failure(handle.job_id, 1, job_timeout())
+            .expect("fail 1");
+
+        manager
+            .fail(handle.job_id, internal_error("Note generation task failed unexpectedly"))
+            .expect("terminal fail");
+
+        let status = manager
+            .get_status(&handle.job_id.to_string())
+            .expect("status");
+        assert_eq!(status.status, JobStatus::Failed);
+        assert_eq!(status.batch_items[0].status, BatchItemStatus::Completed);
+        assert_eq!(status.error.as_ref().map(|e| e.code), Some("INTERNAL_ERROR"));
+
+        // Partial success retained for preview after Failed (same as cancel).
+        let result = manager
+            .get_result(&handle.job_id.to_string())
+            .expect("partial result");
+        assert_eq!(result.title, "A");
+        assert_eq!(result.batch_results.len(), 1);
+        assert_eq!(result.batch_results[0].markdown, "# A");
     }
 }

@@ -83,13 +83,17 @@ export function useNoteJob() {
       setIsActive(false);
       setStatus(terminalStatus);
 
-      // Completed always has a primary result; cancelled may keep partial success.
-      if (terminalStatus === "completed" || terminalStatus === "cancelled") {
+      // Completed always has a primary result; cancelled/failed may keep partial success.
+      if (
+        terminalStatus === "completed" ||
+        terminalStatus === "cancelled" ||
+        terminalStatus === "failed"
+      ) {
         try {
           const jobResult = await getJobResult(id);
           setResult(jobResult);
-          // Partial cancel success: rely on batch summary instead of error banner.
-          setError(null);
+          // Keep failure banner when Failed; cancel/complete rely on batch summary.
+          setError(terminalStatus === "failed" ? (terminalError ?? null) : null);
         } catch (err) {
           setResult(null);
           setError((err as AppErrorPayload) ?? terminalError ?? null);
@@ -102,18 +106,6 @@ export function useNoteJob() {
           // Best-effort; progress UI already has item_index/total.
         }
         return;
-      }
-
-      if (terminalError) {
-        setError(terminalError);
-      }
-      setResult(null);
-
-      try {
-        const response = await getJobStatus(id);
-        setBatchItems(response.batch_items ?? []);
-      } catch {
-        // ignore
       }
     },
     [stopPolling],
