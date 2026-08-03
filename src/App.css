@@ -219,7 +219,7 @@ html {
 
 .config-form input,
 .config-form select,
-.url-label input {
+.url-label textarea {
   width: 100%;
   box-sizing: border-box;
   min-height: 40px;
@@ -230,6 +230,13 @@ html {
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
+}
+
+.url-label textarea {
+  height: auto;
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.4;
 }
 
 .config-form select {
@@ -252,7 +259,7 @@ html {
 
 .config-form input:focus-visible,
 .config-form select:focus-visible,
-.url-label input:focus-visible {
+.url-label textarea:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
