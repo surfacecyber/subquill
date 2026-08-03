@@ -35,6 +35,17 @@ function looksLikeVideoUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
 
+/** First non-empty line that looks like a video URL (for preview). */
+function firstVideoUrl(value: string): string | null {
+  for (const line of value.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (looksLikeVideoUrl(trimmed)) {
+      return trimmed;
+    }
+  }
+  return null;
+}
+
 /** Path prefix check for reveal CTA; normalizes separators for Windows. */
 function isPathInsideDir(filePath: string, dirPath: string): boolean {
   const file = filePath.replace(/\\/g, "/");
@@ -92,8 +103,8 @@ export function WorkspacePage({
   }, [result?.markdown]);
 
   useEffect(() => {
-    const trimmed = url.trim();
-    if (!looksLikeVideoUrl(trimmed) || isActive) {
+    const previewUrl = firstVideoUrl(url);
+    if (!previewUrl || isActive) {
       previewSeqRef.current += 1;
       setVideoPreview(null);
       setPreviewLoading(false);
@@ -106,7 +117,7 @@ export function WorkspacePage({
     setPreviewError(null);
 
     const timer = window.setTimeout(() => {
-      void previewVideo(trimmed)
+      void previewVideo(previewUrl)
         .then((preview) => {
           if (previewSeqRef.current !== seq) {
             return;
@@ -256,10 +267,10 @@ export function WorkspacePage({
       <form className="workspace-input" onSubmit={handleSubmit}>
         <label className="url-label" htmlFor="video-url">
           <span>{t(locale, "bilibiliUrl")}</span>
-          <input
+          <textarea
             id="video-url"
-            type="url"
             name="video-url"
+            rows={4}
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             placeholder={t(locale, "bilibiliUrlPlaceholder")}

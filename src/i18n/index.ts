@@ -52,8 +52,8 @@ const messages = {
     autoSaved: "已自动保存到 {path}",
     bilibiliUrl: "视频链接",
     bilibiliUrlPlaceholder:
-      "https://www.bilibili.com/video/BV… 或 https://www.youtube.com/watch?v=…",
-    bilibiliUrlHint: "多 P 视频可在链接加 ?p=2 指定分 P。",
+      "每行一个链接，例如：\nhttps://www.bilibili.com/video/BV…\nhttps://www.youtube.com/watch?v=…",
+    bilibiliUrlHint: "可一次粘贴多条链接（每行一条）。多 P 视频可在链接加 ?p=2 指定分 P。",
     workspaceEmptyHint:
       "粘贴 B 站或 YouTube 链接即可生成学习笔记。视频需有在线字幕（含 AI 字幕）；长视频可能需要几分钟。",
     workspaceEmptyCookieHint: "部分 B 站视频需配置 SESSDATA Cookie 才能拉取字幕。",
@@ -214,8 +214,9 @@ const messages = {
     autoSaved: "Auto-saved to {path}",
     bilibiliUrl: "Video URL",
     bilibiliUrlPlaceholder:
-      "https://www.bilibili.com/video/BV… or https://www.youtube.com/watch?v=…",
-    bilibiliUrlHint: "For multi-part Bilibili videos, add ?p=2 to pick a part.",
+      "One URL per line, e.g.\nhttps://www.bilibili.com/video/BV…\nhttps://www.youtube.com/watch?v=…",
+    bilibiliUrlHint:
+      "Paste multiple links (one per line). For multi-part Bilibili videos, add ?p=2 to pick a part.",
     workspaceEmptyHint:
       "Paste a Bilibili or YouTube link to generate study notes. The video needs online captions (including AI captions). Long videos may take a few minutes.",
     workspaceEmptyCookieHint:
