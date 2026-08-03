@@ -35,6 +35,13 @@ function looksLikeVideoUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
 
+/** Path prefix check for reveal CTA; normalizes separators for Windows. */
+function isPathInsideDir(filePath: string, dirPath: string): boolean {
+  const file = filePath.replace(/\\/g, "/");
+  const dir = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
+  return file === dir || file.startsWith(`${dir}/`);
+}
+
 export function WorkspacePage({
   locale,
   notesSaveDir = null,
@@ -216,6 +223,11 @@ export function WorkspacePage({
     !notesSaveDir &&
     !result?.saved_path &&
     !dismissSaveGuide;
+  const canRevealSavedPath = Boolean(
+    result?.saved_path &&
+      notesSaveDir &&
+      isPathInsideDir(result.saved_path, notesSaveDir),
+  );
 
   return (
     <section className="workspace" aria-labelledby="workspace-heading">
@@ -422,7 +434,7 @@ export function WorkspacePage({
               >
                 {t(locale, "exportMarkdown")}
               </button>
-              {result.saved_path ? (
+              {canRevealSavedPath ? (
                 <button
                   type="button"
                   className="btn-secondary"

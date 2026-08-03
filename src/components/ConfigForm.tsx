@@ -51,7 +51,14 @@ export function ConfigForm({
   const [apiKeyMessage, setApiKeyMessage] = useState<string | null>(null);
   const [notesDirMessage, setNotesDirMessage] = useState<string | null>(null);
   const [clearingNotesDir, setClearingNotesDir] = useState(false);
-  const [dirty, setDirty] = useState(false);
+
+  const dirty =
+    baseUrl !== initialSettings.base_url ||
+    model !== initialSettings.model ||
+    settingsLocale !== initialSettings.locale ||
+    notesSaveDir !== initialSettings.notes_save_dir ||
+    apiKey.trim().length > 0 ||
+    bilibiliCookie.trim().length > 0;
 
   useEffect(() => {
     onDirtyChange?.(dirty);
@@ -90,7 +97,6 @@ export function ConfigForm({
 
   /** Clear stale “saved / tested” feedback once the form is dirty again. */
   function markDirty() {
-    setDirty(true);
     setSuccess(false);
     setCookieMessage(null);
     setApiKeyMessage(null);
@@ -100,10 +106,6 @@ export function ConfigForm({
   function markConnectionDirty() {
     markDirty();
     setTestSuccess(null);
-  }
-
-  function markClean() {
-    setDirty(false);
   }
 
   async function handleTestConnection() {
@@ -215,14 +217,6 @@ export function ConfigForm({
       });
       setNotesSaveDir(null);
       setNotesDirMessage(t(locale, "notesSaveDirCleared"));
-      // Path clear is persisted immediately; keep dirty only for other unsaved edits.
-      const stillDirty =
-        baseUrl !== initialSettings.base_url ||
-        model !== initialSettings.model ||
-        settingsLocale !== initialSettings.locale ||
-        apiKey.trim().length > 0 ||
-        bilibiliCookie.trim().length > 0;
-      setDirty(stillDirty);
       onSettingsSaved(settings);
     } catch (err) {
       showError(err as AppErrorPayload);
@@ -283,7 +277,6 @@ export function ConfigForm({
         setBilibiliCookie("");
         setNotesSaveDir(settings.notes_save_dir);
         setSuccess(true);
-        markClean();
         onSettingsSaved(settings);
       } catch (err) {
         if (authSaved) {

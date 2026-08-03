@@ -140,11 +140,13 @@ describe("WorkspacePage", () => {
       bvid: "BV1",
       language: "zh-CN",
       segment_count: 12,
-      saved_path: "/tmp/notes/Hello Video.md",
+      saved_path: "/tmp/opennote-notes/Hello Video.md",
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    render(
+      <WorkspacePage locale="en" notesSaveDir="/tmp/opennote-notes" />,
+    );
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -162,6 +164,42 @@ describe("WorkspacePage", () => {
         screen.getByRole("button", { name: "Show in folder" }),
       ).toBeInTheDocument();
     });
+  });
+
+  it("hides reveal when saved path is outside the current notes folder", async () => {
+    const unlisten = vi.fn();
+    vi.mocked(listenJobProgress).mockImplementation(async (handler) => {
+      handler({ job_id: "job-1", stage: "done" });
+      return unlisten;
+    });
+    vi.mocked(startNoteJob).mockResolvedValue({ job_id: "job-1" });
+    vi.mocked(getJobResult).mockResolvedValue({
+      markdown: "# Hello",
+      title: "Hello Video",
+      bvid: "BV1",
+      language: "zh-CN",
+      segment_count: 1,
+      saved_path: "/tmp/old-notes/Hello Video.md",
+    });
+
+    const user = userEvent.setup();
+    render(<WorkspacePage locale="en" notesSaveDir="/tmp/new-notes" />);
+
+    await user.type(
+      screen.getByLabelText("Video URL"),
+      "https://www.bilibili.com/video/BV1xx",
+    );
+    await user.click(screen.getByRole("button", { name: "Generate notes" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Hello Video" }),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Show in folder" }),
+    ).not.toBeInTheDocument();
   });
 
   it("reveals auto-saved file in folder", async () => {
@@ -182,7 +220,7 @@ describe("WorkspacePage", () => {
     vi.mocked(revealInFolder).mockResolvedValue();
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    render(<WorkspacePage locale="en" notesSaveDir="/tmp/notes" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
