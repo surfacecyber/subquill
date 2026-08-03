@@ -99,6 +99,32 @@ describe("App view persistence", () => {
     confirmSpy.mockRestore();
   });
 
+  it("does not prompt when settings edits are reverted", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Video URL")).toBeVisible();
+    });
+
+    await user.click(within(mainNav()).getByRole("button", { name: "Settings" }));
+    const model = await screen.findByLabelText("Model");
+    await user.clear(model);
+    await user.type(model, "temp-model");
+    await user.clear(model);
+    await user.type(model, completedSettings.model);
+
+    await user.click(
+      within(mainNav()).getByRole("button", { name: "Generate notes" }),
+    );
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Video URL")).toBeVisible();
+
+    confirmSpy.mockRestore();
+  });
+
   it("marks the active nav item with aria-current", async () => {
     const user = userEvent.setup();
     render(<App />);
