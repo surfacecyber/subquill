@@ -24,11 +24,13 @@ describe("job command wrappers", () => {
   it("startNoteJob invokes start_note_job", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ job_id: "job-1" });
 
-    await expect(startNoteJob("https://example.com")).resolves.toEqual({
+    await expect(
+      startNoteJob(["https://example.com", "https://example.com/b"]),
+    ).resolves.toEqual({
       job_id: "job-1",
     });
     expect(invoke).toHaveBeenCalledWith("start_note_job", {
-      url: "https://example.com",
+      urls: ["https://example.com", "https://example.com/b"],
     });
   });
 
@@ -98,6 +100,20 @@ describe("job command wrappers", () => {
 
     const { exportJobMarkdown } = await import("./job");
     await exportJobMarkdown("job-1");
-    expect(invoke).toHaveBeenCalledWith("export_job_markdown", { jobId: "job-1" });
+    expect(invoke).toHaveBeenCalledWith("export_job_markdown", {
+      jobId: "job-1",
+      itemIndex: null,
+    });
+  });
+
+  it("exportJobMarkdown passes itemIndex for batch item export", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({ saved: true });
+
+    const { exportJobMarkdown } = await import("./job");
+    await exportJobMarkdown("job-1", 0);
+    expect(invoke).toHaveBeenCalledWith("export_job_markdown", {
+      jobId: "job-1",
+      itemIndex: 0,
+    });
   });
 });

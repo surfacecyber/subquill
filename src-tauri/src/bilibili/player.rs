@@ -1,7 +1,7 @@
 use super::api::{ensure_api_success, ensure_http_success};
 use super::error::{BilibiliError, Result};
 use super::http::{HttpRequest, HttpTransport};
-use super::types::{PlayerApiResponse, SubtitleTrack};
+use super::types::{PlayerApiData, PlayerApiResponse, SubtitleTrack};
 
 /// Match BiliNote: `/x/player/wbi/v2` with `bvid`+`cid`.
 /// Using `/x/player/v2` with `aid` can return empty or *wrong-video* `subtitle_url` values.
@@ -25,6 +25,7 @@ pub fn fetch_subtitle_tracks(
 
     // Empty subtitle lists can appear on a cold call; retry once like before.
     let url = format!("{PLAYER_API}?bvid={bvid}&cid={cid}");
+    let mut need_login_subtitle = false;
     for attempt in 0..2 {
         let response = transport.send(HttpRequest::api(url.clone()).with_cookie())?;
         ensure_http_success(response.status, "player API")?;
@@ -35,10 +36,12 @@ pub fn fetch_subtitle_tracks(
 
         ensure_api_success(payload.code, &payload.message, "player API")?;
 
-        let subtitles = payload
-            .data
-            .map(|data| data.subtitle.subtitles)
-            .unwrap_or_default();
+        let data = payload.data.unwrap_or(PlayerApiData {
+            subtitle: Default::default(),
+            need_login_subtitle: false,
+        });
+        need_login_subtitle = data.need_login_subtitle;
+        let subtitles = data.subtitle.subtitles;
 
         // A track with empty subtitle_url is unusable (seen on non-wbi player/v2).
         let usable: Vec<_> = subtitles
@@ -53,6 +56,14 @@ pub fn fetch_subtitle_tracks(
         if attempt == 0 {
             continue;
         }
+    }
+
+    // Logged-out (or expired cookie) responses often look like "no subtitles"
+    // while the site still shows AI captions — surface AUTH_REQUIRED instead.
+    if need_login_subtitle {
+        return Err(BilibiliError::auth_required(
+            "player API hid subtitle tracks; a valid Bilibili SESSDATA cookie is required",
+        ));
     }
 
     Err(BilibiliError::no_subtitle(
@@ -80,6 +91,27 @@ mod tests {
 
         let err = fetch_subtitle_tracks(&transport, "BV1xx411c7mD", 2).unwrap_err();
         assert_eq!(err.code(), "NO_SUBTITLE");
+    }
+
+    #[test]
+    fn fetch_subtitle_tracks_maps_need_login_to_auth_required() {
+        let transport = MockTransport::new(vec![
+            (
+                "https://api.bilibili.com/x/player/wbi/v2?bvid=BV1xx411c7mD&cid=2",
+                MockResponse::success(
+                    r#"{"code":0,"data":{"need_login_subtitle":true,"subtitle":{"subtitles":[]}}}"#,
+                ),
+            ),
+            (
+                "https://api.bilibili.com/x/player/wbi/v2?bvid=BV1xx411c7mD&cid=2",
+                MockResponse::success(
+                    r#"{"code":0,"data":{"need_login_subtitle":true,"subtitle":{"subtitles":[]}}}"#,
+                ),
+            ),
+        ]);
+
+        let err = fetch_subtitle_tracks(&transport, "BV1xx411c7mD", 2).unwrap_err();
+        assert_eq!(err.code(), "AUTH_REQUIRED");
     }
 
     #[test]

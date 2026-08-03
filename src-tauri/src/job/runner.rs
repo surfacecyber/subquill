@@ -24,6 +24,105 @@ use super::types::{
     JOB_DEADLINE,
 };
 
+/// Run one or more note jobs serially under a single active `job_id`.
+///
+/// Per-item failures are recorded and the queue continues. Cancel stops the
+/// current item and skips remaining pending URLs. Each item uses its own
+/// [`JOB_DEADLINE`] wall clock.
+pub fn run_note_jobs(
+    app: AppHandle,
+    manager: Arc<JobManager>,
+    paths: StoragePaths,
+    job_id: Uuid,
+    urls: Vec<String>,
+    cancel_token: Arc<AtomicBool>,
+) {
+    if urls.is_empty() {
+        finalize_failure(
+            &app,
+            &manager,
+            job_id,
+            ErrorPayload {
+                code: "VALIDATION_ERROR",
+                message: "urls is required".to_string(),
+            },
+        );
+        return;
+    }
+
+    if let Err(err) = manager.mark_running(job_id) {
+        finalize_failure(&app, &manager, job_id, err);
+        return;
+    }
+
+    let fetch = |url: &str, cookie: Option<&str>| media::fetch_subtitles(url, cookie);
+    let total = urls.len();
+    let mut success_count = 0usize;
+    let mut last_error: Option<ErrorPayload> = None;
+    let mut cancelled = false;
+
+    for (index, url) in urls.iter().enumerate() {
+        if cancel_token.load(Ordering::SeqCst) {
+            cancelled = true;
+            let _ = manager.skip_pending_items(job_id);
+            break;
+        }
+
+        let _ = manager.mark_item_running(job_id, index);
+        let started_at = Instant::now();
+
+        match run_note_job_inner(
+            &paths,
+            job_id,
+            url.as_str(),
+            &cancel_token,
+            started_at,
+            &fetch,
+            |progress| {
+                let progress = progress.with_batch(index, total, url);
+                let _ = manager.update_progress(job_id, progress.clone());
+                // Emit mid-job progress so the UI need not wait for the 2s poll fallback.
+                emit_progress(&app, &progress);
+            },
+        ) {
+            Ok(job_result) => {
+                success_count += 1;
+                let _ = manager.record_item_success(job_id, index, job_result);
+            }
+            Err(err) if err.code == "JOB_CANCELLED" => {
+                cancelled = true;
+                let _ = manager.record_item_failure(job_id, index, err);
+                let _ = manager.skip_pending_items(job_id);
+                break;
+            }
+            Err(err) => {
+                last_error = Some(err.clone());
+                let _ = manager.record_item_failure(job_id, index, err);
+            }
+        }
+    }
+
+    if cancelled {
+        finalize_failure(&app, &manager, job_id, job_cancelled());
+        return;
+    }
+
+    if success_count == 0 {
+        finalize_failure(
+            &app,
+            &manager,
+            job_id,
+            last_error.unwrap_or_else(|| {
+                internal_error("Note generation failed for all URLs in the batch")
+            }),
+        );
+        return;
+    }
+
+    finalize_batch_success(&app, &manager, job_id);
+}
+
+/// Backward-compatible single-URL entry point.
 pub fn run_note_job(
     app: AppHandle,
     manager: Arc<JobManager>,
@@ -31,31 +130,9 @@ pub fn run_note_job(
     job_id: Uuid,
     url: String,
     cancel_token: Arc<AtomicBool>,
-    started_at: Instant,
+    _started_at: Instant,
 ) {
-    if let Err(err) = manager.mark_running(job_id) {
-        finalize_failure(&app, &manager, job_id, err);
-        return;
-    }
-
-    let fetch = |url: &str, cookie: Option<&str>| media::fetch_subtitles(url, cookie);
-
-    match run_note_job_inner(
-        &paths,
-        job_id,
-        url.as_str(),
-        &cancel_token,
-        started_at,
-        &fetch,
-        |progress| {
-            let _ = manager.update_progress(job_id, progress.clone());
-            // Emit mid-job progress so the UI need not wait for the 2s poll fallback.
-            emit_progress(&app, &progress);
-        },
-    ) {
-        Ok(job_result) => finalize_success(&app, &manager, job_id, job_result),
-        Err(err) => finalize_failure(&app, &manager, job_id, err),
-    }
+    run_note_jobs(app, manager, paths, job_id, vec![url], cancel_token);
 }
 
 pub fn handle_job_task_join_error(app: AppHandle, manager: Arc<JobManager>, job_id: Uuid) {
@@ -67,8 +144,8 @@ pub fn handle_job_task_join_error(app: AppHandle, manager: Arc<JobManager>, job_
     );
 }
 
-fn finalize_success(app: &AppHandle, manager: &JobManager, job_id: Uuid, result: JobResult) {
-    match manager.complete(job_id, result) {
+fn finalize_batch_success(app: &AppHandle, manager: &JobManager, job_id: Uuid) {
+    match manager.complete_from_stored(job_id) {
         Ok(transition) => emit_progress(app, &transition.progress),
         Err(err) => finalize_failure(app, manager, job_id, err),
     }
@@ -237,6 +314,7 @@ where
         language,
         segment_count,
         saved_path: None,
+        batch_results: Vec::new(),
     })
 }
 

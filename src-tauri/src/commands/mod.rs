@@ -9,8 +9,8 @@ use crate::auth::{
 use crate::bilibili::{fetch_subtitles, BilibiliSubtitleResult};
 use crate::error::{Error, ErrorPayload};
 use crate::job::{
-    handle_job_task_join_error, run_note_job, CancelJobResponse, JobManager, JobResult,
-    JobStatusResponse, StartJobResponse,
+    handle_job_task_join_error, normalize_job_urls, run_note_jobs, CancelJobResponse, JobManager,
+    JobResult, JobStatusResponse, StartJobResponse,
 };
 use crate::llm::{LlmClient, LlmClientConfig, ReqwestTransport};
 use crate::media::{self, VideoPreview};
@@ -292,17 +292,15 @@ fn run_test_llm(paths: &StoragePaths, input: TestLlmInput) -> CommandResult<Test
 pub async fn start_note_job(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
-    url: String,
+    urls: Vec<String>,
 ) -> CommandResult<StartJobResponse> {
-    if url.trim().is_empty() {
-        return Err(ErrorPayload::from(Error::validation("url is required")));
-    }
-    let url = url.trim().to_string();
+    let urls = normalize_job_urls(urls)?;
 
-    let handle = state.jobs.try_start()?;
+    let handle = state.jobs.try_start(urls)?;
     let job_id = handle.job_id;
     let paths = state.paths.clone();
     let jobs = Arc::clone(&state.jobs);
+    let batch_urls = handle.urls.clone();
     let response = StartJobResponse {
         job_id: job_id.to_string(),
     };
@@ -311,14 +309,13 @@ pub async fn start_note_job(
         let app_for_task = app.clone();
         let jobs_for_error = Arc::clone(&jobs);
         let join_result = tauri::async_runtime::spawn_blocking(move || {
-            run_note_job(
+            run_note_jobs(
                 app_for_task,
                 jobs,
                 paths,
                 job_id,
-                url,
+                batch_urls,
                 handle.cancel_token,
-                handle.started_at,
             );
         })
         .await;
@@ -380,8 +377,12 @@ pub async fn export_job_markdown(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     job_id: String,
+    item_index: Option<usize>,
 ) -> CommandResult<ExportJobMarkdownResponse> {
-    let result = state.jobs.get_result(&job_id)?;
+    let result = match item_index {
+        Some(index) => state.jobs.get_item_result(&job_id, index)?,
+        None => state.jobs.get_result(&job_id)?,
+    };
     let default_name = sanitize_markdown_filename(&result.title);
     let markdown = result.markdown;
 

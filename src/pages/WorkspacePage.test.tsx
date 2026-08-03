@@ -1,7 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { NotificationProvider } from "../notifications/NotificationProvider";
 import { WorkspacePage } from "./WorkspacePage";
 
 vi.mock("../api/job", () => ({
@@ -17,6 +19,7 @@ vi.mock("../api/job", () => ({
 vi.mock("../api/commands", () => ({
   revealInFolder: vi.fn(),
   previewVideo: vi.fn(),
+  getAuthStatus: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -27,7 +30,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(),
 }));
 
-import { previewVideo, revealInFolder } from "../api/commands";
+import { getAuthStatus, previewVideo, revealInFolder } from "../api/commands";
 import {
   cancelJob,
   getJobResult,
@@ -36,10 +39,18 @@ import {
   startNoteJob,
 } from "../api/job";
 
+function renderWorkspace(ui: ReactElement) {
+  return render(<NotificationProvider>{ui}</NotificationProvider>);
+}
+
 describe("WorkspacePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listenJobProgress).mockResolvedValue(vi.fn());
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: false,
+      has_bilibili_cookie: false,
+    });
     vi.mocked(previewVideo).mockRejectedValue({
       code: "VALIDATION_ERROR",
       message: "skip preview in tests",
@@ -47,7 +58,7 @@ describe("WorkspacePage", () => {
   });
 
   it("shows empty-state guidance before the first result", () => {
-    render(<WorkspacePage locale="en" onOpenSettings={vi.fn()} />);
+    renderWorkspace(<WorkspacePage locale="en" onOpenSettings={vi.fn()} />);
 
     expect(
       screen.getByText(/Paste a Bilibili or YouTube link/i),
@@ -60,7 +71,7 @@ describe("WorkspacePage", () => {
   it("opens settings from empty-state CTA", async () => {
     const onOpenSettings = vi.fn();
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" onOpenSettings={onOpenSettings} />);
+    renderWorkspace(<WorkspacePage locale="en" onOpenSettings={onOpenSettings} />);
 
     await user.click(screen.getByRole("button", { name: "Open settings" }));
     expect(onOpenSettings).toHaveBeenCalled();
@@ -75,7 +86,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    renderWorkspace(<WorkspacePage locale="en" />);
 
     const input = screen.getByLabelText("Video URL");
     await user.type(input, "https://www.bilibili.com/video/BV1xx");
@@ -112,7 +123,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    renderWorkspace(<WorkspacePage locale="en" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -144,7 +155,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(
+    renderWorkspace(
       <WorkspacePage locale="en" notesSaveDir="/tmp/opennote-notes" />,
     );
 
@@ -183,7 +194,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" notesSaveDir="/tmp/new-notes" />);
+    renderWorkspace(<WorkspacePage locale="en" notesSaveDir="/tmp/new-notes" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -220,7 +231,7 @@ describe("WorkspacePage", () => {
     vi.mocked(revealInFolder).mockResolvedValue();
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" notesSaveDir="/tmp/notes" />);
+    renderWorkspace(<WorkspacePage locale="en" notesSaveDir="/tmp/notes" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -246,7 +257,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" onOpenSettings={onOpenSettings} />);
+    renderWorkspace(<WorkspacePage locale="en" onOpenSettings={onOpenSettings} />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -278,7 +289,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    renderWorkspace(<WorkspacePage locale="en" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -287,10 +298,12 @@ describe("WorkspacePage", () => {
     await user.click(screen.getByRole("button", { name: "Generate notes" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Retry" }));
+    await user.click(
+      within(screen.getByRole("alert")).getByRole("button", { name: "Retry" }),
+    );
 
     await waitFor(() => {
       expect(startNoteJob).toHaveBeenCalledTimes(2);
@@ -311,7 +324,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    renderWorkspace(<WorkspacePage locale="en" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -327,6 +340,186 @@ describe("WorkspacePage", () => {
       },
       { timeout: 3000 },
     );
+  });
+
+  it("shows configure-cookie tip when auth_required and cookie missing", async () => {
+    vi.mocked(previewVideo).mockResolvedValue({
+      title: "Locked Captions",
+      platform: "bilibili",
+      video_id: "BV1xx",
+      duration_ms: 60000,
+      p: 1,
+      page_count: 1,
+      part_title: null,
+      has_subtitles: false,
+      auth_required: true,
+    });
+
+    const user = userEvent.setup();
+    renderWorkspace(<WorkspacePage locale="en" />);
+
+    await user.type(
+      screen.getByLabelText("Video URL"),
+      "https://www.bilibili.com/video/BV1xx",
+    );
+
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText(/SESSDATA cookie may be required/i),
+        ).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("shows stale-cookie tip when auth_required and cookie configured", async () => {
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: false,
+      has_bilibili_cookie: true,
+    });
+    vi.mocked(previewVideo).mockResolvedValue({
+      title: "Stale Cookie Video",
+      platform: "bilibili",
+      video_id: "BV1yy",
+      duration_ms: 60000,
+      p: 1,
+      page_count: 1,
+      part_title: null,
+      has_subtitles: false,
+      auth_required: true,
+    });
+
+    const user = userEvent.setup();
+    renderWorkspace(<WorkspacePage locale="en" />);
+
+    await user.type(
+      screen.getByLabelText("Video URL"),
+      "https://www.bilibili.com/video/BV1yy",
+    );
+
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText(/cookie expired — update SESSDATA/i),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Retry" }),
+        ).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("retries all previews from the auth tip Retry button", async () => {
+    vi.mocked(previewVideo)
+      .mockResolvedValueOnce({
+        title: "Locked Captions",
+        platform: "bilibili",
+        video_id: "BV1xx",
+        duration_ms: 60000,
+        p: 1,
+        page_count: 1,
+        part_title: null,
+        has_subtitles: false,
+        auth_required: true,
+      })
+      .mockResolvedValueOnce({
+        title: "Unlocked Captions",
+        platform: "bilibili",
+        video_id: "BV1xx",
+        duration_ms: 60000,
+        p: 1,
+        page_count: 1,
+        part_title: null,
+        has_subtitles: true,
+        auth_required: false,
+      });
+
+    const user = userEvent.setup();
+    renderWorkspace(<WorkspacePage locale="en" />);
+
+    await user.type(
+      screen.getByLabelText("Video URL"),
+      "https://www.bilibili.com/video/BV1xx",
+    );
+
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText(/SESSDATA cookie may be required/i),
+        ).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+
+    expect(previewVideo).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => {
+      expect(previewVideo).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Unlocked Captions")).toBeInTheDocument();
+      expect(screen.getByText("Caption track found")).toBeInTheDocument();
+    });
+  });
+
+  it("refetches previews when workspace becomes active again", async () => {
+    vi.mocked(previewVideo)
+      .mockResolvedValueOnce({
+        title: "Stale Cookie Video",
+        platform: "bilibili",
+        video_id: "BV1yy",
+        duration_ms: 60000,
+        p: 1,
+        page_count: 1,
+        part_title: null,
+        has_subtitles: false,
+        auth_required: true,
+      })
+      .mockResolvedValueOnce({
+        title: "Fresh Cookie Video",
+        platform: "bilibili",
+        video_id: "BV1yy",
+        duration_ms: 60000,
+        p: 1,
+        page_count: 1,
+        part_title: null,
+        has_subtitles: true,
+        auth_required: false,
+      });
+
+    const user = userEvent.setup();
+    const { rerender } = renderWorkspace(<WorkspacePage locale="en" active />);
+
+    await user.type(
+      screen.getByLabelText("Video URL"),
+      "https://www.bilibili.com/video/BV1yy",
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("Stale Cookie Video")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+    expect(previewVideo).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <NotificationProvider>
+        <WorkspacePage locale="en" active={false} />
+      </NotificationProvider>,
+    );
+    rerender(
+      <NotificationProvider>
+        <WorkspacePage locale="en" active />
+      </NotificationProvider>,
+    );
+
+    await waitFor(() => {
+      expect(previewVideo).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Fresh Cookie Video")).toBeInTheDocument();
+      expect(screen.getByText("Caption track found")).toBeInTheDocument();
+    });
   });
 
   it("shows save-folder guide after success when auto-save is unset", async () => {
@@ -347,7 +540,7 @@ describe("WorkspacePage", () => {
 
     const onOpenSettings = vi.fn();
     const user = userEvent.setup();
-    render(
+    renderWorkspace(
       <WorkspacePage
         locale="en"
         notesSaveDir={null}
@@ -368,6 +561,107 @@ describe("WorkspacePage", () => {
     });
   });
 
+  it("lets users switch between successful batch notes", async () => {
+    const unlisten = vi.fn();
+    vi.mocked(listenJobProgress).mockImplementation(async (handler) => {
+      handler({
+        job_id: "job-batch",
+        stage: "done",
+        item_index: 1,
+        item_total: 2,
+      });
+      return unlisten;
+    });
+    vi.mocked(startNoteJob).mockResolvedValue({ job_id: "job-batch" });
+    vi.mocked(getJobResult).mockResolvedValue({
+      markdown: "# Second",
+      title: "Second Video",
+      bvid: "BV2",
+      language: "zh-CN",
+      segment_count: 2,
+      saved_path: null,
+      batch_results: [
+        {
+          index: 0,
+          url: "https://www.bilibili.com/video/BV1",
+          markdown: "# First",
+          title: "First Video",
+          bvid: "BV1",
+          language: "zh-CN",
+          segment_count: 1,
+          saved_path: null,
+        },
+        {
+          index: 1,
+          url: "https://www.bilibili.com/video/BV2",
+          markdown: "# Second",
+          title: "Second Video",
+          bvid: "BV2",
+          language: "zh-CN",
+          segment_count: 2,
+          saved_path: null,
+        },
+      ],
+    });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-batch",
+      status: "completed",
+      progress: {
+        job_id: "job-batch",
+        stage: "done",
+        item_index: 1,
+        item_total: 2,
+      },
+      batch_items: [
+        {
+          index: 0,
+          url: "https://www.bilibili.com/video/BV1",
+          status: "completed",
+          title: "First Video",
+        },
+        {
+          index: 1,
+          url: "https://www.bilibili.com/video/BV2",
+          status: "completed",
+          title: "Second Video",
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    renderWorkspace(
+      <WorkspacePage locale="en" notesSaveDir={null} onOpenSettings={vi.fn()} />,
+    );
+
+    await user.type(
+      screen.getByLabelText("Video URL"),
+      "https://www.bilibili.com/video/BV1\nhttps://www.bilibili.com/video/BV2",
+    );
+    await user.click(screen.getByRole("button", { name: "Generate notes" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Second Video" })).toBeInTheDocument();
+      expect(screen.getByText("Second")).toBeInTheDocument();
+    });
+
+    const batch = screen.getByLabelText("Batch results");
+    const selectButtons = within(batch).getAllByRole("button", {
+      name: "View this note",
+    });
+    expect(selectButtons).toHaveLength(2);
+
+    await user.click(selectButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "First Video" })).toBeInTheDocument();
+      expect(screen.getByText("First")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Batch notes stay in this job/i),
+    ).toBeInTheDocument();
+  });
+
   it("expands and collapses the note preview", async () => {
     const unlisten = vi.fn();
     vi.mocked(listenJobProgress).mockImplementation(async (handler) => {
@@ -384,7 +678,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    renderWorkspace(<WorkspacePage locale="en" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),
@@ -422,7 +716,7 @@ describe("WorkspacePage", () => {
     });
 
     const user = userEvent.setup();
-    render(<WorkspacePage locale="en" />);
+    renderWorkspace(<WorkspacePage locale="en" />);
 
     await user.type(
       screen.getByLabelText("Video URL"),

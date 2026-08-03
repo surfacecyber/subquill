@@ -27,9 +27,9 @@ function toAppError(error: unknown): AppErrorPayload {
   };
 }
 
-export async function startNoteJob(url: string): Promise<StartJobResponse> {
+export async function startNoteJob(urls: string[]): Promise<StartJobResponse> {
   try {
-    return await invoke<StartJobResponse>("start_note_job", { url });
+    return await invoke<StartJobResponse>("start_note_job", { urls });
   } catch (error) {
     throw toAppError(error);
   }
@@ -79,10 +79,12 @@ export interface ExportJobMarkdownResponse {
 
 export async function exportJobMarkdown(
   jobId: string,
+  itemIndex?: number,
 ): Promise<ExportJobMarkdownResponse> {
   try {
     return await invoke<ExportJobMarkdownResponse>("export_job_markdown", {
       jobId,
+      itemIndex: itemIndex ?? null,
     });
   } catch (error) {
     throw toAppError(error);

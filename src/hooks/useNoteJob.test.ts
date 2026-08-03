@@ -31,11 +31,17 @@ describe("useNoteJob listener cleanup", () => {
     const unlisten = vi.fn();
     vi.mocked(listenJobProgress).mockResolvedValue(unlisten);
     vi.mocked(startNoteJob).mockResolvedValue({ job_id: "job-1" });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-1",
+      status: "queued",
+      progress: { job_id: "job-1", stage: "fetching_subtitles" },
+      batch_items: [],
+    });
 
     const { result } = renderHook(() => useNoteJob());
 
     await act(async () => {
-      await result.current.start("https://example.com");
+      await result.current.start(["https://example.com"]);
     });
 
     act(() => {
@@ -48,7 +54,7 @@ describe("useNoteJob listener cleanup", () => {
   it("fetches result after done event", async () => {
     const unlisten = vi.fn();
     vi.mocked(listenJobProgress).mockImplementation(async (handler) => {
-      handler({ job_id: "job-1", stage: "done" });
+      handler({ job_id: "job-1", stage: "done", item_index: 0, item_total: 2 });
       return unlisten;
     });
     vi.mocked(startNoteJob).mockResolvedValue({ job_id: "job-1" });
@@ -58,12 +64,54 @@ describe("useNoteJob listener cleanup", () => {
       bvid: "BV1",
       language: "zh-CN",
       segment_count: 1,
+      batch_results: [
+        {
+          index: 0,
+          url: "https://example.com/a",
+          markdown: "# A",
+          title: "A",
+          bvid: "BV0",
+          language: "zh-CN",
+          segment_count: 1,
+        },
+        {
+          index: 1,
+          url: "https://example.com/b",
+          markdown: "# hi",
+          title: "hi",
+          bvid: "BV1",
+          language: "zh-CN",
+          segment_count: 1,
+        },
+      ],
+    });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-1",
+      status: "completed",
+      progress: { job_id: "job-1", stage: "done", item_index: 1, item_total: 2 },
+      batch_items: [
+        {
+          index: 0,
+          url: "https://example.com/a",
+          status: "completed",
+          title: "A",
+        },
+        {
+          index: 1,
+          url: "https://example.com/b",
+          status: "completed",
+          title: "hi",
+        },
+      ],
     });
 
     const { result } = renderHook(() => useNoteJob());
 
     await act(async () => {
-      await result.current.start("https://example.com");
+      await result.current.start([
+        "https://example.com/a",
+        "https://example.com/b",
+      ]);
     });
 
     await act(async () => {
@@ -72,6 +120,12 @@ describe("useNoteJob listener cleanup", () => {
 
     expect(getJobResult).toHaveBeenCalledWith("job-1");
     expect(result.current.result?.title).toBe("hi");
+    expect(result.current.result?.batch_results).toHaveLength(2);
+    expect(result.current.batchItems).toHaveLength(2);
+    expect(startNoteJob).toHaveBeenCalledWith([
+      "https://example.com/a",
+      "https://example.com/b",
+    ]);
   });
 
   it("handles done event before start response without reactivating job", async () => {
@@ -96,11 +150,17 @@ describe("useNoteJob listener cleanup", () => {
       language: "zh-CN",
       segment_count: 1,
     });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-early",
+      status: "completed",
+      progress: { job_id: "job-early", stage: "done" },
+      batch_items: [],
+    });
 
     const { result } = renderHook(() => useNoteJob());
 
     await act(async () => {
-      await result.current.start("https://example.com");
+      await result.current.start(["https://example.com"]);
     });
 
     await act(async () => {
@@ -109,7 +169,6 @@ describe("useNoteJob listener cleanup", () => {
 
     expect(result.current.isActive).toBe(false);
     expect(result.current.result?.title).toBe("early");
-    expect(getJobStatus).not.toHaveBeenCalled();
   });
 
   it("ignores a second start while the first is still claiming", async () => {
@@ -123,12 +182,18 @@ describe("useNoteJob listener cleanup", () => {
     vi.mocked(startNoteJob)
       .mockImplementationOnce(() => firstStart)
       .mockResolvedValueOnce({ job_id: "job-2" });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-1",
+      status: "queued",
+      progress: { job_id: "job-1", stage: "fetching_subtitles" },
+      batch_items: [],
+    });
 
     const { result } = renderHook(() => useNoteJob());
 
     let first!: Promise<void>;
     act(() => {
-      first = result.current.start("https://example.com/one");
+      first = result.current.start(["https://example.com/one"]);
     });
 
     await act(async () => {
@@ -138,7 +203,7 @@ describe("useNoteJob listener cleanup", () => {
     expect(result.current.isActive).toBe(true);
 
     await act(async () => {
-      await result.current.start("https://example.com/two");
+      await result.current.start(["https://example.com/two"]);
     });
 
     expect(startNoteJob).toHaveBeenCalledTimes(1);
@@ -173,12 +238,13 @@ describe("useNoteJob listener cleanup", () => {
       job_id: "job-1",
       status: "running",
       progress: { job_id: "job-1", stage: "calling_llm" },
+      batch_items: [],
     });
 
     const { result } = renderHook(() => useNoteJob());
 
     await act(async () => {
-      await result.current.start("https://example.com/one");
+      await result.current.start(["https://example.com/one"]);
     });
 
     expect(result.current.jobId).toBe("job-1");
@@ -197,7 +263,7 @@ describe("useNoteJob listener cleanup", () => {
     expect(result.current.error?.code).toBe("NETWORK_ERROR");
 
     await act(async () => {
-      await result.current.start("https://example.com/two");
+      await result.current.start(["https://example.com/two"]);
     });
 
     expect(startNoteJob).toHaveBeenCalledTimes(2);
