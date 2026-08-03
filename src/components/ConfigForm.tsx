@@ -280,6 +280,11 @@ export function ConfigForm({
         ? t(locale, "saving")
         : t(locale, "save");
 
+  // Settings: disable Save when nothing changed. Onboarding keeps Save enabled so
+  // users can finish setup even when defaults are already correct.
+  const submitDisabled =
+    saving || (mode === "settings" && !dirty);
+
   return (
     <form
       className={`config-form${mode === "settings" ? " config-form-docked" : ""}`}
@@ -456,7 +461,16 @@ export function ConfigForm({
       </div>
 
       <div className="form-actions">
-        <button type="submit" className="btn-primary" disabled={saving}>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={submitDisabled}
+          title={
+            mode === "settings" && !dirty && !saving
+              ? t(locale, "noChangesToSave")
+              : undefined
+          }
+        >
           {submitLabel}
         </button>
       </div>
