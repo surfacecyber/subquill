@@ -11,6 +11,7 @@ import { testLlm } from "../api/job";
 import type { UiLocale } from "../i18n";
 import { t } from "../i18n";
 import { localizeError } from "../i18n/errors";
+import { useNotify } from "../notifications/NotificationProvider";
 import type { AppErrorPayload, AuthStatus, Locale, SettingsView } from "../types/settings";
 
 export type ConfigFormMode = "onboarding" | "settings";
@@ -30,6 +31,7 @@ export function ConfigForm({
   onSettingsSaved,
   onDirtyChange,
 }: ConfigFormProps) {
+  const { notify, clear: clearNotifications } = useNotify();
   const [baseUrl, setBaseUrl] = useState(initialSettings.base_url);
   const [model, setModel] = useState(initialSettings.model);
   const [settingsLocale, setSettingsLocale] = useState<Locale>(
@@ -43,13 +45,8 @@ export function ConfigForm({
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testSuccess, setTestSuccess] = useState<string | null>(null);
-  const [cookieMessage, setCookieMessage] = useState<string | null>(null);
-  const [apiKeyMessage, setApiKeyMessage] = useState<string | null>(null);
-  const [notesDirMessage, setNotesDirMessage] = useState<string | null>(null);
   const [clearingNotesDir, setClearingNotesDir] = useState(false);
 
   const dirty =
@@ -95,26 +92,18 @@ export function ConfigForm({
     );
   }
 
-  /** Clear stale “saved / tested” feedback once the form is dirty again. */
+  /** Clear stale toast feedback once the form is dirty again. */
   function markDirty() {
-    setSuccess(false);
-    setCookieMessage(null);
-    setApiKeyMessage(null);
-    setNotesDirMessage(null);
+    clearNotifications();
   }
 
   function markConnectionDirty() {
     markDirty();
-    setTestSuccess(null);
   }
 
   async function handleTestConnection() {
     setTesting(true);
-    setTestSuccess(null);
-    setSuccess(false);
-    setCookieMessage(null);
-    setApiKeyMessage(null);
-    setNotesDirMessage(null);
+    clearNotifications();
     setError(null);
     setErrorDetail(null);
 
@@ -124,7 +113,10 @@ export function ConfigForm({
         model,
         api_key: apiKey.trim().length > 0 ? apiKey.trim() : undefined,
       });
-      setTestSuccess(`${t(locale, "testConnectionModel")}: ${result.model}`);
+      notify(
+        "success",
+        `${t(locale, "testConnectionSuccess")} — ${t(locale, "testConnectionModel")}: ${result.model}`,
+      );
     } catch (err) {
       showError(err as AppErrorPayload);
     } finally {
@@ -137,11 +129,7 @@ export function ConfigForm({
       return;
     }
 
-    setApiKeyMessage(null);
-    setCookieMessage(null);
-    setNotesDirMessage(null);
-    setSuccess(false);
-    setTestSuccess(null);
+    clearNotifications();
     setError(null);
     setErrorDetail(null);
 
@@ -149,7 +137,7 @@ export function ConfigForm({
       const status = await saveAuth({ clear_api_key: true });
       setAuthStatus(status);
       setApiKey("");
-      setApiKeyMessage(t(locale, "apiKeyCleared"));
+      notify("success", t(locale, "apiKeyCleared"));
     } catch (err) {
       showError(err as AppErrorPayload);
     }
@@ -160,10 +148,7 @@ export function ConfigForm({
       return;
     }
 
-    setCookieMessage(null);
-    setApiKeyMessage(null);
-    setNotesDirMessage(null);
-    setSuccess(false);
+    clearNotifications();
     setError(null);
     setErrorDetail(null);
 
@@ -171,7 +156,7 @@ export function ConfigForm({
       const status = await saveAuth({ clear_bilibili_cookie: true });
       setAuthStatus(status);
       setBilibiliCookie("");
-      setCookieMessage(t(locale, "cookieCleared"));
+      notify("success", t(locale, "cookieCleared"));
     } catch (err) {
       showError(err as AppErrorPayload);
     }
@@ -200,11 +185,7 @@ export function ConfigForm({
     setClearingNotesDir(true);
     setError(null);
     setErrorDetail(null);
-    setSuccess(false);
-    setCookieMessage(null);
-    setApiKeyMessage(null);
-    setNotesDirMessage(null);
-    setTestSuccess(null);
+    clearNotifications();
 
     try {
       // Persist only the path clear; leave other unsaved form edits alone.
@@ -216,7 +197,7 @@ export function ConfigForm({
         notes_save_dir: null,
       });
       setNotesSaveDir(null);
-      setNotesDirMessage(t(locale, "notesSaveDirCleared"));
+      notify("success", t(locale, "notesSaveDirCleared"));
       onSettingsSaved(settings);
     } catch (err) {
       showError(err as AppErrorPayload);
@@ -229,11 +210,7 @@ export function ConfigForm({
     event.preventDefault();
     setError(null);
     setErrorDetail(null);
-    setSuccess(false);
-    setCookieMessage(null);
-    setApiKeyMessage(null);
-    setNotesDirMessage(null);
-    setTestSuccess(null);
+    clearNotifications();
     setSaving(true);
 
     let authSaved = false;
@@ -276,7 +253,7 @@ export function ConfigForm({
         setApiKey("");
         setBilibiliCookie("");
         setNotesSaveDir(settings.notes_save_dir);
-        setSuccess(true);
+        notify("success", t(locale, "saved"));
         onSettingsSaved(settings);
       } catch (err) {
         if (authSaved) {
@@ -382,15 +359,6 @@ export function ConfigForm({
         ) : null}
       </div>
 
-      {testSuccess ? (
-        <p className="form-success" role="status">
-          {t(locale, "testConnectionSuccess")} — {testSuccess}
-        </p>
-      ) : null}
-      {apiKeyMessage ? (
-        <p className="form-success" role="status">{apiKeyMessage}</p>
-      ) : null}
-
       <label>
         <span>{t(locale, "bilibiliCookie")}</span>
         <input
@@ -425,10 +393,6 @@ export function ConfigForm({
             {t(locale, "clearCookie")}
           </button>
         </div>
-      ) : null}
-
-      {cookieMessage ? (
-        <p className="form-success" role="status">{cookieMessage}</p>
       ) : null}
 
       <label>
@@ -483,17 +447,12 @@ export function ConfigForm({
         </div>
       ) : null}
 
-      {notesDirMessage ? (
-        <p className="form-success" role="status">{notesDirMessage}</p>
-      ) : null}
-
       {error ? (
         <div className="form-error-block" role="alert">
           <p className="form-error">{error}</p>
           {errorDetail ? <p className="form-error-detail">{errorDetail}</p> : null}
         </div>
       ) : null}
-      {success ? <p className="form-success">{t(locale, "saved")}</p> : null}
       </div>
 
       <div className="form-actions">

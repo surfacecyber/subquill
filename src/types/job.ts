@@ -17,6 +17,36 @@ export type JobProgressStage =
   | "failed"
   | "cancelled";
 
+export type BatchItemStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "skipped";
+
+export interface BatchItemView {
+  index: number;
+  url: string;
+  status: BatchItemStatus;
+  title?: string;
+  /** Safe error code only — never includes message or secrets. */
+  error_code?: string;
+  saved_path?: string;
+}
+
+/** Successful per-URL note returned inside [`JobResult.batch_results`]. */
+export interface BatchItemResult {
+  index: number;
+  url: string;
+  markdown: string;
+  title: string;
+  bvid: string;
+  language: string;
+  segment_count: number;
+  saved_path?: string | null;
+}
+
 export interface JobProgress {
   job_id: string;
   stage: JobProgressStage;
@@ -24,6 +54,10 @@ export interface JobProgress {
   chunk_count?: number;
   /** Safe error code only — never includes message or secrets. */
   error_code?: string;
+  /** 0-based index of the URL currently being processed. */
+  item_index?: number;
+  item_total?: number;
+  item_url?: string;
 }
 
 export interface JobResult {
@@ -34,6 +68,8 @@ export interface JobResult {
   segment_count: number;
   /** Absolute path when auto-save succeeded. */
   saved_path?: string | null;
+  /** All successful notes for multi-URL jobs; omitted/empty for single-URL. */
+  batch_results?: BatchItemResult[];
 }
 
 export interface StartJobResponse {
@@ -45,6 +81,7 @@ export interface JobStatusResponse {
   status: JobStatus;
   progress: JobProgress;
   error?: AppErrorPayload;
+  batch_items?: BatchItemView[];
 }
 
 export interface CancelJobResponse {

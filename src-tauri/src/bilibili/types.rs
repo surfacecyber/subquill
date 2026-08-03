@@ -111,6 +111,9 @@ pub struct PlayerApiResponse {
 pub struct PlayerApiData {
     #[serde(default)]
     pub subtitle: PlayerSubtitleBlock,
+    /// When true, Bilibili hides subtitle tracks until the request is logged in.
+    #[serde(default)]
+    pub need_login_subtitle: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]

@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { NotificationProvider } from "../notifications/NotificationProvider";
 import { ConfigForm } from "./ConfigForm";
 
 vi.mock("../api/commands", () => ({
@@ -27,6 +29,10 @@ const baseSettings = {
   notes_save_dir: null,
 };
 
+function renderForm(ui: ReactElement) {
+  return render(<NotificationProvider>{ui}</NotificationProvider>);
+}
+
 describe("ConfigForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,7 +44,7 @@ describe("ConfigForm", () => {
 
   it("requires api key when none is saved", async () => {
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="onboarding"
         locale="en"
@@ -57,7 +63,7 @@ describe("ConfigForm", () => {
     vi.mocked(testLlm).mockResolvedValue({ ok: true, model: "deepseek-v4-flash" });
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"
@@ -83,7 +89,7 @@ describe("ConfigForm", () => {
     vi.mocked(testLlm).mockResolvedValue({ ok: true, model: "deepseek-v4-flash" });
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="onboarding"
         locale="en"
@@ -114,7 +120,7 @@ describe("ConfigForm", () => {
   });
 
   it("shows SESSDATA cookie guidance", () => {
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"
@@ -148,7 +154,7 @@ describe("ConfigForm", () => {
     });
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"
@@ -183,7 +189,7 @@ describe("ConfigForm", () => {
     });
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"
@@ -218,7 +224,7 @@ describe("ConfigForm", () => {
     });
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"
@@ -259,7 +265,7 @@ describe("ConfigForm", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"
@@ -294,7 +300,7 @@ describe("ConfigForm", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"
@@ -318,7 +324,7 @@ describe("ConfigForm", () => {
   });
 
   it("collapses cookie instructions behind a details summary", () => {
-    render(
+    renderForm(
       <ConfigForm
         mode="onboarding"
         locale="en"
@@ -344,7 +350,7 @@ describe("ConfigForm", () => {
     });
 
     const user = userEvent.setup();
-    render(
+    renderForm(
       <ConfigForm
         mode="settings"
         locale="en"

@@ -163,6 +163,13 @@ html {
   overflow-y: auto;
 }
 
+.view-panel:has(.workspace) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .view-panel[hidden] {
   display: none !important;
 }
@@ -315,46 +322,56 @@ html {
   gap: 10px;
 }
 
-/* Settings: dock Save at the bottom of the pane; fields scroll above it. */
-.app-main:has(.settings-page) {
+/* Settings / Workspace: dock primary actions at bottom of pane (first screen);
+   content scrolls above. Avoid sticky — sticky + .app-main padding cropped buttons. */
+.app-main:has(.settings-page),
+.app-main:has(.view-panel:not([hidden]) .workspace) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.settings-page {
+.settings-page,
+.workspace {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.settings-page .page-header {
+.settings-page .page-header,
+.workspace .page-header {
   flex-shrink: 0;
   margin-bottom: 16px;
 }
 
-.settings-page .config-form-docked {
+.settings-page .config-form-docked,
+.workspace .workspace-docked {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
+  /* Bleed into .app-main horizontal padding so the field scrollbar
+     sits at the main column’s right edge (closer to Workspace/About). */
+  margin-inline: -32px;
 }
 
-.settings-page .config-form-docked .config-form-body {
+.settings-page .config-form-docked .config-form-body,
+.workspace .workspace-docked .workspace-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: grid;
   gap: 16px;
-  /* Keep focus outlines (2px ring + 2px offset) from being clipped by overflow. */
-  padding: 4px 4px 8px;
+  /* Horizontal: restore page inset; vertical: room for focus rings. */
+  padding: 4px 32px 12px;
 }
 
-.settings-page .config-form-docked .form-actions {
+.settings-page .config-form-docked .form-actions,
+.workspace .workspace-docked .workspace-actions {
   flex-shrink: 0;
-  padding-top: 12px;
+  padding: 12px 32px 0;
   border-top: 1px solid var(--color-border);
   background: var(--color-bg);
 }
@@ -447,17 +464,96 @@ html {
 }
 
 .job-progress-chunk,
+.job-progress-batch,
 .job-progress-cancel {
   margin: 6px 0 0;
   font-size: 0.92rem;
+}
+
+.job-progress-batch-url {
+  word-break: break-all;
 }
 
 .job-progress-eta {
   margin-top: 6px;
 }
 
+.batch-summary {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.batch-summary-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.batch-summary-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.batch-summary-item {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.92rem;
+}
+
+.batch-summary-item.is-selected {
+  border-radius: calc(var(--radius) - 2px);
+  background: color-mix(in srgb, var(--color-border) 35%, transparent);
+}
+
+.batch-summary-select {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  margin: 0;
+  padding: 4px 6px;
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.batch-summary-select:hover,
+.batch-summary-select:focus-visible {
+  background: color-mix(in srgb, var(--color-border) 45%, transparent);
+  outline: none;
+}
+
+.batch-summary-status {
+  flex: 0 0 auto;
+  min-width: 4.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.batch-summary-status.status-completed {
+  color: var(--color-ok, #2f6b3a);
+}
+
+.batch-summary-status.status-failed,
+.batch-summary-status.status-cancelled {
+  color: var(--color-warn, #8a4b00);
+}
+
+.batch-summary-meta {
+  min-width: 0;
+  word-break: break-word;
+}
+
 .workspace-empty {
-  margin: 0 0 20px;
+  margin: 0;
   padding: 14px 16px;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius);
@@ -501,6 +597,11 @@ html {
 
 .cookie-hint .muted-inline {
   margin-top: 6px;
+}
+
+.video-preview-list {
+  display: grid;
+  gap: 10px;
 }
 
 .video-preview {
@@ -700,6 +801,90 @@ html {
   .app-main {
     padding: calc(20px + var(--titlebar-inset)) 16px 20px;
   }
+
+  .settings-page .config-form-docked,
+  .workspace .workspace-docked {
+    margin-inline: -16px;
+  }
+
+  .settings-page .config-form-docked .config-form-body,
+  .workspace .workspace-docked .workspace-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .settings-page .config-form-docked .form-actions,
+  .workspace .workspace-docked .workspace-actions {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+.notification-stack {
+  position: fixed;
+  top: calc(12px + var(--titlebar-inset));
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.notification {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 12%, transparent);
+  color: var(--color-text);
+}
+
+.notification-success {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+}
+
+.notification-error {
+  border-color: color-mix(in srgb, var(--color-error) 35%, var(--color-border));
+}
+
+.notification-message {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.notification-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.notification-close:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+
+.notification-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 @media (max-width: 480px) {

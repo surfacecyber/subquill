@@ -10,6 +10,7 @@ import {
 } from "../api/job";
 import type { AppErrorPayload } from "../types/settings";
 import type {
+  BatchItemView,
   JobProgress,
   JobProgressStage,
   JobResult,
@@ -48,6 +49,7 @@ export function useNoteJob() {
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [result, setResult] = useState<JobResult | null>(null);
   const [error, setError] = useState<AppErrorPayload | null>(null);
+  const [batchItems, setBatchItems] = useState<BatchItemView[]>([]);
   const [isActive, setIsActive] = useState(false);
   const [cancelRequested, setCancelRequested] = useState(false);
 
@@ -81,13 +83,23 @@ export function useNoteJob() {
       setIsActive(false);
       setStatus(terminalStatus);
 
-      if (terminalStatus === "completed") {
+      // Completed always has a primary result; cancelled may keep partial success.
+      if (terminalStatus === "completed" || terminalStatus === "cancelled") {
         try {
           const jobResult = await getJobResult(id);
           setResult(jobResult);
+          // Partial cancel success: rely on batch summary instead of error banner.
           setError(null);
         } catch (err) {
-          setError(err as AppErrorPayload);
+          setResult(null);
+          setError((err as AppErrorPayload) ?? terminalError ?? null);
+        }
+
+        try {
+          const response = await getJobStatus(id);
+          setBatchItems(response.batch_items ?? []);
+        } catch {
+          // Best-effort; progress UI already has item_index/total.
         }
         return;
       }
@@ -96,6 +108,13 @@ export function useNoteJob() {
         setError(terminalError);
       }
       setResult(null);
+
+      try {
+        const response = await getJobStatus(id);
+        setBatchItems(response.batch_items ?? []);
+      } catch {
+        // ignore
+      }
     },
     [stopPolling],
   );
@@ -137,9 +156,26 @@ export function useNoteJob() {
 
         setStatus(response.status);
         setProgress(response.progress);
+        setBatchItems(response.batch_items ?? []);
 
         if (!isActiveStatus(response.status)) {
           await handleTerminal(id, response.status, response.error);
+          return;
+        }
+
+        // Mid-batch: pull finished notes so the UI can preview/switch early.
+        const completedCount = (response.batch_items ?? []).filter(
+          (item) => item.status === "completed",
+        ).length;
+        if (completedCount > 0) {
+          try {
+            const jobResult = await getJobResult(id);
+            if (!isTerminalRef.current) {
+              setResult(jobResult);
+            }
+          } catch {
+            // Still JOB_NOT_READY or transient; ignore until next poll/terminal.
+          }
         }
       } catch {
         // Polling is a fallback; ignore transient failures.
@@ -192,12 +228,13 @@ export function useNoteJob() {
     setProgress(null);
     setResult(null);
     setError(null);
+    setBatchItems([]);
     setIsActive(false);
     setCancelRequested(false);
   }, [cleanupListener, stopPolling]);
 
   const start = useCallback(
-    async (url: string) => {
+    async (urls: string[]) => {
       if (startInFlightRef.current) {
         return;
       }
@@ -228,7 +265,7 @@ export function useNoteJob() {
       unlistenRef.current = unlisten;
 
       try {
-        const response = await startNoteJob(url);
+        const response = await startNoteJob(urls);
         claimJob(response.job_id);
       } catch (err) {
         cleanupListener();
@@ -273,6 +310,7 @@ export function useNoteJob() {
     progress,
     result,
     error,
+    batchItems,
     isActive,
     cancelRequested,
     start,

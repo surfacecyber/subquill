@@ -25,6 +25,14 @@ export function JobProgressDisplay({
           total: progress.chunk_count,
         })
       : null;
+  const batchTotal = progress.item_total ?? 0;
+  const batchLabel =
+    batchTotal > 1 && progress.item_index !== undefined
+      ? t(locale, "progressBatchItem", {
+          current: progress.item_index + 1,
+          total: batchTotal,
+        })
+      : null;
   const percent = progressPercent(
     progress.stage,
     progress.chunk_index,
@@ -50,6 +58,17 @@ export function JobProgressDisplay({
           </p>
         ) : null}
       </div>
+      {batchLabel ? (
+        <p className="job-progress-batch">
+          {batchLabel}
+          {progress.item_url ? (
+            <span className="muted-inline job-progress-batch-url">
+              {" "}
+              · {progress.item_url}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
       {isBusy ? (
         <div
           className="job-progress-bar"
