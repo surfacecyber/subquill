@@ -33,6 +33,10 @@ const messages = {
     testingConnection: "测试中…",
     testConnectionSuccess: "连接成功",
     testConnectionModel: "模型",
+    clearApiKey: "清除密钥",
+    apiKeyCleared: "API Key 已清除",
+    clearApiKeyConfirm:
+      "清除已保存的 API Key？清除后需重新填写才能生成笔记。",
     clearCookie: "清除 Cookie",
     cookieCleared: "Cookie 已清除",
     notesSaveDir: "笔记保存位置",
@@ -40,7 +44,8 @@ const messages = {
       "可选。配置后，生成完成的笔记会自动保存为 Markdown 到该目录。留空则仅保存在应用内预览。",
     notesSaveDirPlaceholder: "未设置（不自动保存）",
     pickNotesSaveDir: "选择文件夹",
-    clearNotesSaveDir: "清除",
+    clearNotesSaveDir: "清除位置",
+    notesSaveDirCleared: "保存位置已清除",
     autoSaved: "已自动保存到 {path}",
     bilibiliUrl: "视频链接",
     bilibiliUrlPlaceholder:
@@ -155,6 +160,10 @@ const messages = {
     testingConnection: "Testing…",
     testConnectionSuccess: "Connection successful",
     testConnectionModel: "Model",
+    clearApiKey: "Clear API key",
+    apiKeyCleared: "API key cleared",
+    clearApiKeyConfirm:
+      "Clear the saved API key? You'll need to enter it again before generating notes.",
     clearCookie: "Clear cookie",
     cookieCleared: "Cookie cleared",
     notesSaveDir: "Notes save location",
@@ -162,7 +171,8 @@ const messages = {
       "Optional. When set, generated notes are saved as Markdown files in this folder. Leave empty to keep notes in-app only.",
     notesSaveDirPlaceholder: "Not set (no auto-save)",
     pickNotesSaveDir: "Choose folder",
-    clearNotesSaveDir: "Clear",
+    clearNotesSaveDir: "Clear location",
+    notesSaveDirCleared: "Save location cleared",
     autoSaved: "Auto-saved to {path}",
     bilibiliUrl: "Video URL",
     bilibiliUrlPlaceholder:

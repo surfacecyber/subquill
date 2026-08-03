@@ -344,6 +344,7 @@ mod tests {
                 api_key: Some("sk-test".to_string()),
                 bilibili_cookie: None,
                 clear_bilibili_cookie: false,
+                clear_api_key: false,
             },
         )
         .expect("save auth");
