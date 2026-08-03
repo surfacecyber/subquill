@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NotificationProvider } from "../notifications/NotificationProvider";
@@ -139,18 +140,10 @@ describe("ConfigForm", () => {
     ).toBeInTheDocument();
   });
 
-  it("clears saved feedback when the form is edited again", async () => {
+  it("disables Save in settings when unchanged, enables when dirty", async () => {
     vi.mocked(getAuthStatus).mockResolvedValue({
       has_api_key: true,
       has_bilibili_cookie: false,
-    });
-    vi.mocked(saveAuth).mockResolvedValue({
-      has_api_key: true,
-      has_bilibili_cookie: false,
-    });
-    vi.mocked(saveSettings).mockResolvedValue({
-      ...baseSettings,
-      onboarding_completed: true,
     });
 
     const user = userEvent.setup();
@@ -163,6 +156,109 @@ describe("ConfigForm", () => {
       />,
     );
 
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    expect(saveButton).toBeDisabled();
+    expect(saveButton).toHaveAttribute("title", "No changes to save");
+
+    await user.clear(screen.getByLabelText("Model"));
+    await user.type(screen.getByLabelText("Model"), "gpt-4o");
+
+    expect(saveButton).toBeEnabled();
+    expect(saveButton).not.toHaveAttribute("title");
+  });
+
+  it("re-disables Save after a successful settings save", async () => {
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveAuth).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveSettings).mockImplementation(async (input) => ({
+      version: 1,
+      base_url: input.base_url,
+      model: input.model,
+      locale: input.locale,
+      onboarding_completed: input.onboarding_completed,
+      notes_save_dir: input.notes_save_dir ?? null,
+    }));
+
+    function Harness() {
+      const [settings, setSettings] = useState({
+        ...baseSettings,
+        onboarding_completed: true,
+      });
+      return (
+        <ConfigForm
+          mode="settings"
+          locale="en"
+          initialSettings={settings}
+          onSettingsSaved={setSettings}
+        />
+      );
+    }
+
+    const user = userEvent.setup();
+    renderForm(<Harness />);
+
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    expect(saveButton).toBeDisabled();
+
+    await user.clear(screen.getByLabelText("Model"));
+    await user.type(screen.getByLabelText("Model"), "gpt-4o");
+    expect(saveButton).toBeEnabled();
+
+    await user.click(saveButton);
+    await waitFor(() => {
+      expect(screen.getByText("Settings saved")).toBeInTheDocument();
+      expect(saveButton).toBeDisabled();
+    });
+  });
+
+  it("keeps onboarding Save enabled when the form is unchanged", () => {
+    renderForm(
+      <ConfigForm
+        mode="onboarding"
+        locale="en"
+        initialSettings={baseSettings}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Save and continue" }),
+    ).toBeEnabled();
+  });
+
+  it("clears saved feedback when the form is edited again", async () => {
+    vi.mocked(getAuthStatus).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveAuth).mockResolvedValue({
+      has_api_key: true,
+      has_bilibili_cookie: false,
+    });
+    vi.mocked(saveSettings).mockResolvedValue({
+      ...baseSettings,
+      onboarding_completed: true,
+      model: "gpt-4o-mini",
+    });
+
+    const user = userEvent.setup();
+    renderForm(
+      <ConfigForm
+        mode="settings"
+        locale="en"
+        initialSettings={{ ...baseSettings, onboarding_completed: true }}
+        onSettingsSaved={vi.fn()}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText("Model"));
+    await user.type(screen.getByLabelText("Model"), "gpt-4o-mini");
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
       expect(screen.getByText("Settings saved")).toBeInTheDocument();
@@ -198,6 +294,8 @@ describe("ConfigForm", () => {
       />,
     );
 
+    await user.clear(screen.getByLabelText("Model"));
+    await user.type(screen.getByLabelText("Model"), "broken-model");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
