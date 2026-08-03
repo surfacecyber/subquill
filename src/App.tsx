@@ -84,7 +84,16 @@ function App() {
       <div className="app-layout">
         <div className="titlebar-drag" data-tauri-drag-region aria-hidden="true" />
         <nav className="app-nav" aria-label={t(uiLocale, "navAriaLabel")}>
-          <p className="nav-brand">{t(uiLocale, "appTitle")}</p>
+          <p className="nav-brand">
+            <img
+              className="nav-brand-icon"
+              src="/app-icon.png"
+              alt=""
+              width={24}
+              height={24}
+            />
+            {t(uiLocale, "appTitle")}
+          </p>
           <ul className="nav-list">
             <li>
               <button

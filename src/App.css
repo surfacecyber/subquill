@@ -112,10 +112,20 @@ html {
 }
 
 .nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 20px;
   font-family: var(--font-display);
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.nav-brand-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .nav-list {
