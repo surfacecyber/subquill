@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **opennote** (1662 symbols, 3978 relationships, 141 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **subquill** (1662 symbols, 3978 relationships, 141 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -24,10 +24,10 @@ This project is indexed by GitNexus as **opennote** (1662 symbols, 3978 relation
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/opennote/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/opennote/clusters` | All functional areas |
-| `gitnexus://repo/opennote/processes` | All execution flows |
-| `gitnexus://repo/opennote/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/subquill/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/subquill/clusters` | All functional areas |
+| `gitnexus://repo/subquill/processes` | All execution flows |
+| `gitnexus://repo/subquill/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
