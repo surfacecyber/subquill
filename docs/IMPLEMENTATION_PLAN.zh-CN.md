@@ -1,8 +1,8 @@
-# OpenNote 实现计划
+# Subquill 实现计划
 
 [English](IMPLEMENTATION_PLAN.md) · [文档索引](README.zh-CN.md)
 
-本文是 OpenNote 的权威工程计划：面向 macOS + Windows 的桌面应用（Tauri 2 + React + TypeScript + Vite），从 **Bilibili** 与 **YouTube** 视频字幕生成学习笔记。业务逻辑在 Rust 中实现；Tauri command 仅作薄 IPC 适配层。
+本文是 Subquill 的权威工程计划：面向 macOS + Windows 的桌面应用（Tauri 2 + React + TypeScript + Vite），从 **Bilibili** 与 **YouTube** 视频字幕生成学习笔记。业务逻辑在 Rust 中实现；Tauri command 仅作薄 IPC 适配层。
 
 ## 架构原则
 
@@ -26,7 +26,7 @@
 单应用根目录（非 monorepo）：
 
 ```
-opennote/
+subquill/
   src/                 # React UI
   src-tauri/           # Rust 后端 + Tauri 壳
   docs/
@@ -38,8 +38,8 @@ opennote/
 
 | 文件 | macOS / Linux | Windows |
 | --- | --- | --- |
-| `settings.json` | `~/.config/opennote/settings.json`（`$XDG_CONFIG_HOME/opennote`） | `%APPDATA%\opennote\settings.json` |
-| `auth.json` | `~/.local/share/opennote/auth.json`（`$XDG_DATA_HOME/opennote`） | `%LOCALAPPDATA%\opennote\auth.json` |
+| `settings.json` | `~/.config/subquill/settings.json`（`$XDG_CONFIG_HOME/subquill`） | `%APPDATA%\subquill\settings.json` |
+| `auth.json` | `~/.local/share/subquill/auth.json`（`$XDG_DATA_HOME/subquill`） | `%LOCALAPPDATA%\subquill\auth.json` |
 
 ### `settings.json`（version 1）
 
@@ -206,7 +206,7 @@ LLM 输出与抓取的描述会以 Markdown 渲染。一律视为 **不可信**�
 - 解析 `youtube.com` / `youtu.be` / `m.youtube.com` / `music.youtube.com`（及 `*.youtube.com`）的 watch、shorts、短链。
 - 通过公开 InnerTube Android player 端点（`youtubei/v1/player`）拉取元数据与字幕轨道；不使用 YouTube 账号 Cookie。
 - 优先选择可用字幕轨；从白名单主机下载 timedtext / JSON3。
-- 受限 / 年龄限制 / 需登录视频返回 `VIDEO_RESTRICTED` — OpenNote **不支持** YouTube 登录。
+- 受限 / 年龄限制 / 需登录视频返回 `VIDEO_RESTRICTED` — Subquill **不支持** YouTube 登录。
 - 单元测试覆盖 URL 解析与选轨；真实网络拉取测试为可选 / 在常规 CI 中忽略。
 
 ## LLM 集成（`llm/`）

@@ -1,4 +1,4 @@
-# OpenNote
+# Subquill
 
 [中文](README.zh-CN.md)
 
@@ -8,7 +8,7 @@ Desktop app that generates study notes from **Bilibili** and **YouTube** video s
 - **Platform**: macOS + Windows
 - **Docs**: [Documentation index](docs/README.md)
 
-## Why OpenNote
+## Why Subquill
 
 Paste a public video URL, fetch captions (including AI captions where available), and get structured Markdown study notes via an OpenAI-compatible LLM — without sending API keys or cookies to the frontend UI after save.
 
@@ -48,8 +48,8 @@ The Vite dev server listens on port **1420**. The Tauri window opens at about **
 
 | File | macOS / Linux | Windows |
 | --- | --- | --- |
-| `settings.json` | `~/.config/opennote/settings.json` | `%APPDATA%\opennote\settings.json` |
-| `auth.json` | `~/.local/share/opennote/auth.json` | `%LOCALAPPDATA%\opennote\auth.json` |
+| `settings.json` | `~/.config/subquill/settings.json` | `%APPDATA%\subquill\settings.json` |
+| `auth.json` | `~/.local/share/subquill/auth.json` | `%LOCALAPPDATA%\subquill\auth.json` |
 
 Never commit API keys or cookies. These files live outside the repository.
 

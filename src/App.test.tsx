@@ -49,7 +49,7 @@ describe("App view persistence", () => {
       has_bilibili_cookie: false,
     });
     vi.mocked(getAppInfo).mockResolvedValue({
-      name: "OpenNote",
+      name: "Subquill",
       version: "0.1.0",
     });
     vi.mocked(listenJobProgress).mockResolvedValue(vi.fn());

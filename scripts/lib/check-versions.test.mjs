@@ -14,7 +14,7 @@ describe("check-versions", () => {
   });
 
   it("reads Cargo.toml versions", () => {
-    const cargo = `[package]\nname = "opennote"\nversion = "0.1.0"\n`;
+    const cargo = `[package]\nname = "subquill"\nversion = "0.1.0"\n`;
     expect(readCargoVersion(cargo)).toBe("0.1.0");
   });
 

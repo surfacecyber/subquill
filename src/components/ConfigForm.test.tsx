@@ -310,7 +310,7 @@ describe("ConfigForm", () => {
       has_api_key: true,
       has_bilibili_cookie: false,
     });
-    vi.mocked(pickNotesSaveDir).mockResolvedValue("/tmp/opennote-notes");
+    vi.mocked(pickNotesSaveDir).mockResolvedValue("/tmp/subquill-notes");
     vi.mocked(saveAuth).mockResolvedValue({
       has_api_key: true,
       has_bilibili_cookie: false,
@@ -318,7 +318,7 @@ describe("ConfigForm", () => {
     vi.mocked(saveSettings).mockResolvedValue({
       ...baseSettings,
       onboarding_completed: true,
-      notes_save_dir: "/tmp/opennote-notes",
+      notes_save_dir: "/tmp/subquill-notes",
     });
 
     const user = userEvent.setup();
@@ -337,7 +337,7 @@ describe("ConfigForm", () => {
 
     await waitFor(() => {
       expect(pickNotesSaveDir).toHaveBeenCalled();
-      expect(screen.getByDisplayValue("/tmp/opennote-notes")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("/tmp/subquill-notes")).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -345,7 +345,7 @@ describe("ConfigForm", () => {
     await waitFor(() => {
       expect(saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({
-          notes_save_dir: "/tmp/opennote-notes",
+          notes_save_dir: "/tmp/subquill-notes",
         }),
       );
     });
@@ -455,7 +455,7 @@ describe("ConfigForm", () => {
         initialSettings={{
           ...baseSettings,
           onboarding_completed: true,
-          notes_save_dir: "/tmp/opennote-notes",
+          notes_save_dir: "/tmp/subquill-notes",
         }}
         onSettingsSaved={onSettingsSaved}
       />,

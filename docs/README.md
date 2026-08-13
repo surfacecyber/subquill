@@ -1,4 +1,4 @@
-# OpenNote documentation
+# Subquill documentation
 
 [中文](README.zh-CN.md)
 

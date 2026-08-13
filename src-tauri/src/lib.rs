@@ -26,7 +26,7 @@ use paths::StoragePaths;
 pub fn run() {
     let paths = StoragePaths::from_env().unwrap_or_else(|err| {
         eprintln!(
-            "OpenNote failed to resolve configuration directories: {}",
+            "Subquill failed to resolve configuration directories: {}",
             err.message()
         );
         std::process::exit(1);

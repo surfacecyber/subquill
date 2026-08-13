@@ -242,7 +242,7 @@ where
             }
             Err(err) => {
                 // Auto-save must not fail the completed generation.
-                eprintln!("OpenNote auto-save failed: {}", err.message());
+                eprintln!("Subquill auto-save failed: {}", err.message());
             }
         }
     }

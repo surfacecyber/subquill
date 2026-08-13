@@ -1,8 +1,8 @@
-# OpenNote Implementation Plan
+# Subquill Implementation Plan
 
 [中文](IMPLEMENTATION_PLAN.zh-CN.md) · [Docs index](README.md)
 
-This document is the canonical engineering plan for OpenNote: a macOS + Windows desktop app (Tauri 2 + React + TypeScript + Vite) that generates study notes from **Bilibili** and **YouTube** video subtitles. Business logic lives in Rust; Tauri commands are a thin IPC adapter.
+This document is the canonical engineering plan for Subquill: a macOS + Windows desktop app (Tauri 2 + React + TypeScript + Vite) that generates study notes from **Bilibili** and **YouTube** video subtitles. Business logic lives in Rust; Tauri commands are a thin IPC adapter.
 
 ## Architecture principles
 
@@ -26,7 +26,7 @@ Do **not** add empty Rust modules that compile but do nothing.
 Single application root (not a monorepo):
 
 ```
-opennote/
+subquill/
   src/                 # React UI
   src-tauri/           # Rust backend + Tauri shell
   docs/
@@ -38,8 +38,8 @@ opennote/
 
 | File | macOS / Linux | Windows |
 | --- | --- | --- |
-| `settings.json` | `~/.config/opennote/settings.json` (`$XDG_CONFIG_HOME/opennote`) | `%APPDATA%\opennote\settings.json` |
-| `auth.json` | `~/.local/share/opennote/auth.json` (`$XDG_DATA_HOME/opennote`) | `%LOCALAPPDATA%\opennote\auth.json` |
+| `settings.json` | `~/.config/subquill/settings.json` (`$XDG_CONFIG_HOME/subquill`) | `%APPDATA%\subquill\settings.json` |
+| `auth.json` | `~/.local/share/subquill/auth.json` (`$XDG_DATA_HOME/subquill`) | `%LOCALAPPDATA%\subquill\auth.json` |
 
 ### `settings.json` (version 1)
 
@@ -206,7 +206,7 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 - Parse `youtube.com` / `youtu.be` / `m.youtube.com` / `music.youtube.com` (and `*.youtube.com`) watch, shorts, and short-link URLs.
 - Fetch metadata and caption tracks via the public InnerTube Android player endpoint (`youtubei/v1/player`); no YouTube account cookie.
 - Prefer usable caption tracks; download timedtext / JSON3 from allowlisted hosts.
-- Restricted / age-gated / login-required videos surface `VIDEO_RESTRICTED` — OpenNote does **not** support YouTube sign-in.
+- Restricted / age-gated / login-required videos surface `VIDEO_RESTRICTED` — Subquill does **not** support YouTube sign-in.
 - Unit tests cover URL parsing and selection; live network fetch tests are optional / ignored in normal CI.
 
 ## LLM integration (`llm/`)

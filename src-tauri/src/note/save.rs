@@ -55,7 +55,7 @@ pub fn sanitize_markdown_filename(title: &str) -> String {
     base = truncate_filename_chars(&base, FILENAME_MAX_CHARS);
 
     if base.is_empty() {
-        base = "opennote".to_string();
+        base = "subquill".to_string();
     }
 
     if is_windows_reserved_filename(&base) {
@@ -89,7 +89,7 @@ fn unique_markdown_path(dir: &Path, title: &str, video_id: &str) -> PathBuf {
     let stem = primary
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("opennote");
+        .unwrap_or("subquill");
     let id = sanitize_id_fragment(video_id);
     let with_id = if id.is_empty() {
         None
@@ -146,8 +146,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sanitize_empty_title_defaults_to_opennote() {
-        assert_eq!(sanitize_markdown_filename(""), "opennote.md");
+    fn sanitize_empty_title_defaults_to_subquill() {
+        assert_eq!(sanitize_markdown_filename(""), "subquill.md");
     }
 
     #[test]
