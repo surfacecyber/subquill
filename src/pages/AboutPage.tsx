@@ -36,7 +36,7 @@ export function AboutPage({ locale, updater }: AboutPageProps) {
       <dl className="about-meta">
         <div className="about-row">
           <dt>{t(locale, "appTitle")}</dt>
-          <dd translate="no">OpenNote</dd>
+          <dd translate="no">Subquill</dd>
         </div>
         <div className="about-row">
           <dt>{t(locale, "version")}</dt>

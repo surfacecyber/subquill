@@ -1,12 +1,12 @@
 [package]
-name = "opennote"
+name = "subquill"
 version = "0.1.0"
-description = "OpenNote — Bilibili / YouTube video notes"
-authors = ["OpenNote"]
+description = "Subquill — Bilibili / YouTube video notes"
+authors = ["Subquill"]
 edition = "2021"
 
 [lib]
-name = "opennote_lib"
+name = "subquill_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

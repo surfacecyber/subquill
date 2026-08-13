@@ -7,7 +7,7 @@ import { AboutPage } from "../pages/AboutPage";
 import type { UpdaterRuntime } from "./updaterState";
 
 vi.mock("../api/commands", () => ({
-  getAppInfo: vi.fn().mockResolvedValue({ name: "OpenNote", version: "0.1.0" }),
+  getAppInfo: vi.fn().mockResolvedValue({ name: "Subquill", version: "0.1.0" }),
 }));
 
 function SharedUpdaterShell({ runtime }: { runtime: UpdaterRuntime }) {

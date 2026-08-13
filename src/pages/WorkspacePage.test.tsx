@@ -174,12 +174,12 @@ describe("WorkspacePage", () => {
       bvid: "BV1",
       language: "zh-CN",
       segment_count: 12,
-      saved_path: "/tmp/opennote-notes/Hello Video.md",
+      saved_path: "/tmp/subquill-notes/Hello Video.md",
     });
 
     const user = userEvent.setup();
     renderWorkspace(
-      <WorkspacePage locale="en" notesSaveDir="/tmp/opennote-notes" />,
+      <WorkspacePage locale="en" notesSaveDir="/tmp/subquill-notes" />,
     );
 
     await user.type(

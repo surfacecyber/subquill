@@ -1,10 +1,10 @@
-# Releasing OpenNote
+# Releasing Subquill
 
 [中文](RELEASING.zh-CN.md) · [Docs index](README.md)
 
-This document describes how to configure GitHub Actions releases and the Tauri 2 updater for OpenNote.
+This document describes how to configure GitHub Actions releases and the Tauri 2 updater for Subquill.
 
-OpenNote separates three different trust layers:
+Subquill separates three different trust layers:
 
 1. **Updater payload signing** (required, cannot be disabled) — proves update archives were produced by the release pipeline.
 2. **macOS code signing / notarization** (optional for internal beta) — reduces Gatekeeper warnings for the installer.
@@ -17,7 +17,7 @@ Only the updater signing keys are required for in-app updates.
 Run this locally on a trusted machine. **Do not run key generation in CI** and **never commit the private key**.
 
 ```bash
-npm run tauri signer generate -- -w ~/.opennote/tauri-updater.key
+npm run tauri signer generate -- -w ~/.subquill/tauri-updater.key
 ```
 
 The command prints a **public key** and writes the **private key** to the path you pass with `-w`.
@@ -90,7 +90,7 @@ Local builds without the release config continue to work and skip updater config
 To inspect the generated patch locally:
 
 ```bash
-export GITHUB_REPOSITORY=your-org/opennote
+export GITHUB_REPOSITORY=your-org/subquill
 export TAURI_UPDATER_PUBLIC_KEY='paste-public-key-here'
 node scripts/generate-release-config.mjs
 ```

@@ -1,4 +1,4 @@
-# OpenNote
+# Subquill
 
 [English](README.md)
 
@@ -8,7 +8,7 @@
 - **平台**：macOS + Windows
 - **文档**：[文档索引](docs/README.zh-CN.md)
 
-## 为什么做 OpenNote
+## 为什么做 Subquill
 
 粘贴公开视频链接，拉取字幕（含可用的 AI 字幕），通过兼容 OpenAI 协议的 LLM 生成结构化 Markdown 学习笔记。API Key 与 Cookie 保存后不会在前端明文回显。
 
@@ -48,8 +48,8 @@ Vite 开发服务器监听 **1420** 端口。Tauri 窗口约 **960×700**。
 
 | 文件 | macOS / Linux | Windows |
 | --- | --- | --- |
-| `settings.json` | `~/.config/opennote/settings.json` | `%APPDATA%\opennote\settings.json` |
-| `auth.json` | `~/.local/share/opennote/auth.json` | `%LOCALAPPDATA%\opennote\auth.json` |
+| `settings.json` | `~/.config/subquill/settings.json` | `%APPDATA%\subquill\settings.json` |
+| `auth.json` | `~/.local/share/subquill/auth.json` | `%LOCALAPPDATA%\subquill\auth.json` |
 
 切勿将 API Key 或 Cookie 提交到仓库。这些文件位于仓库之外。
 

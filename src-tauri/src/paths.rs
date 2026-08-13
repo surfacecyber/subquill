@@ -84,7 +84,7 @@ pub fn resolve_auth_dir(env: &PathEnv) -> Result<PathBuf> {
     #[cfg(windows)]
     {
         if let Some(local_app_data) = env.local_app_data.as_deref() {
-            return Ok(PathBuf::from(local_app_data).join("opennote"));
+            return Ok(PathBuf::from(local_app_data).join("subquill"));
         }
 
         let home = env
@@ -94,13 +94,13 @@ pub fn resolve_auth_dir(env: &PathEnv) -> Result<PathBuf> {
         return Ok(PathBuf::from(home)
             .join("AppData")
             .join("Local")
-            .join("opennote"));
+            .join("subquill"));
     }
 
     #[cfg(not(windows))]
     {
         if let Some(xdg_data_home) = env.xdg_data_home.as_deref() {
-            return Ok(PathBuf::from(xdg_data_home).join("opennote"));
+            return Ok(PathBuf::from(xdg_data_home).join("subquill"));
         }
 
         let home = env
@@ -110,7 +110,7 @@ pub fn resolve_auth_dir(env: &PathEnv) -> Result<PathBuf> {
         Ok(PathBuf::from(home)
             .join(".local")
             .join("share")
-            .join("opennote"))
+            .join("subquill"))
     }
 }
 
@@ -118,7 +118,7 @@ pub fn resolve_settings_dir(env: &PathEnv) -> Result<PathBuf> {
     #[cfg(windows)]
     {
         if let Some(app_data) = env.app_data.as_deref() {
-            return Ok(PathBuf::from(app_data).join("opennote"));
+            return Ok(PathBuf::from(app_data).join("subquill"));
         }
 
         let home = env
@@ -128,20 +128,20 @@ pub fn resolve_settings_dir(env: &PathEnv) -> Result<PathBuf> {
         return Ok(PathBuf::from(home)
             .join("AppData")
             .join("Roaming")
-            .join("opennote"));
+            .join("subquill"));
     }
 
     #[cfg(not(windows))]
     {
         if let Some(xdg_config_home) = env.xdg_config_home.as_deref() {
-            return Ok(PathBuf::from(xdg_config_home).join("opennote"));
+            return Ok(PathBuf::from(xdg_config_home).join("subquill"));
         }
 
         let home = env
             .home
             .as_deref()
             .ok_or_else(|| Error::storage("HOME is not set"))?;
-        Ok(PathBuf::from(home).join(".config").join("opennote"))
+        Ok(PathBuf::from(home).join(".config").join("subquill"))
     }
 }
 
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn auth_and_settings_paths_are_separate() {
-        let root = std::env::temp_dir().join("opennote-path-test");
+        let root = std::env::temp_dir().join("subquill-path-test");
         let paths = StoragePaths::from_dirs(root.join("auth"), root.join("settings"));
 
         assert_eq!(paths.auth_file(), root.join("auth").join("auth.json"));
@@ -267,7 +267,7 @@ mod tests {
         };
         assert_eq!(
             resolve_auth_dir(&env).expect("auth dir"),
-            PathBuf::from("/custom/data/opennote")
+            PathBuf::from("/custom/data/subquill")
         );
     }
 
@@ -280,7 +280,7 @@ mod tests {
         };
         assert_eq!(
             resolve_settings_dir(&env).expect("settings dir"),
-            PathBuf::from("/custom/config/opennote")
+            PathBuf::from("/custom/config/subquill")
         );
     }
 
@@ -301,7 +301,7 @@ mod tests {
         };
         assert_eq!(
             resolve_auth_dir(&env).expect("auth dir"),
-            PathBuf::from("/home/test/.local/share/opennote")
+            PathBuf::from("/home/test/.local/share/subquill")
         );
     }
 
@@ -314,7 +314,7 @@ mod tests {
         };
         assert_eq!(
             resolve_auth_dir(&env).expect("auth dir"),
-            PathBuf::from(r"C:\Users\test\AppData\Local\opennote")
+            PathBuf::from(r"C:\Users\test\AppData\Local\subquill")
         );
     }
 
@@ -327,7 +327,7 @@ mod tests {
         };
         assert_eq!(
             resolve_settings_dir(&env).expect("settings dir"),
-            PathBuf::from(r"C:\Users\test\AppData\Roaming\opennote")
+            PathBuf::from(r"C:\Users\test\AppData\Roaming\subquill")
         );
     }
 

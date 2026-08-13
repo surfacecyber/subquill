@@ -83,7 +83,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: OpenNote ${{ github.ref_name }}
+          releaseName: Subquill ${{ github.ref_name }}
           releaseBody: |
             See the attached installers and updater artifacts for this release.
 

@@ -1,10 +1,10 @@
-# 发布 OpenNote
+# 发布 Subquill
 
 [English](RELEASING.md) · [文档索引](README.zh-CN.md)
 
-本文说明如何为 OpenNote 配置 GitHub Actions 发布与 Tauri 2 更新器。
+本文说明如何为 Subquill 配置 GitHub Actions 发布与 Tauri 2 更新器。
 
-OpenNote 区分三层信任：
+Subquill 区分三层信任：
 
 1. **更新包签名**（必需，不可关闭）— 证明更新归档由发布流水线生成。
 2. **macOS 代码签名 / 公证**（内部测试可选）— 降低安装包的 Gatekeeper 警告。
@@ -17,7 +17,7 @@ OpenNote 区分三层信任：
 在可信本机执行。**不要在 CI 中生成密钥**，也**切勿提交私钥**。
 
 ```bash
-npm run tauri signer generate -- -w ~/.opennote/tauri-updater.key
+npm run tauri signer generate -- -w ~/.subquill/tauri-updater.key
 ```
 
 命令会打印 **公钥**，并将 **私钥** 写到 `-w` 指定路径。
@@ -90,7 +90,7 @@ git push origin v0.1.0
 在本地查看生成的补丁：
 
 ```bash
-export GITHUB_REPOSITORY=your-org/opennote
+export GITHUB_REPOSITORY=your-org/subquill
 export TAURI_UPDATER_PUBLIC_KEY='paste-public-key-here'
 node scripts/generate-release-config.mjs
 ```

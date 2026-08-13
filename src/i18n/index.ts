@@ -4,7 +4,7 @@ export type UiLocale = "zh" | "en";
 
 const messages = {
   zh: {
-    appTitle: "OpenNote",
+    appTitle: "Subquill",
     navWorkspace: "生成笔记",
     navSettings: "设置",
     navAbout: "关于",
@@ -102,13 +102,13 @@ const messages = {
     segmentCount: "{count} 段字幕",
     loading: "加载中…",
     loadSettingsFailed: "无法加载设置。",
-    aboutTitle: "关于 OpenNote",
+    aboutTitle: "关于 Subquill",
     aboutDescription: "从 B 站 / YouTube 视频字幕生成学习笔记的桌面应用。",
     aboutPlatformsTitle: "支持平台",
     aboutPlatforms: "Bilibili、YouTube（公开字幕）。",
     aboutPrivacyTitle: "隐私",
     aboutPrivacy:
-      "API Key 与 B 站 Cookie 仅保存在本机，不会上传到 OpenNote 服务器。Cookie 仅用于请求 B 站官方 API。",
+      "API Key 与 B 站 Cookie 仅保存在本机，不会上传到 Subquill 服务器。Cookie 仅用于请求 B 站官方 API。",
     aboutCookieTitle: "Cookie 用途",
     aboutCookie:
       "可选的 SESSDATA 用于拉取需登录或 AI 字幕；YouTube 无需 Cookie。",
@@ -165,7 +165,7 @@ const messages = {
       "拉取到的字幕与视频时长明显不匹配（可能是 B 站 AI 字幕串台或未生成完整）。请稍后重试，或换有人工字幕的视频。",
     error_VIDEO_NOT_FOUND: "未找到该视频。",
     error_VIDEO_RESTRICTED:
-      "该 YouTube 视频需要登录，或受年龄/地区限制。多数公开视频无需登录；OpenNote 不支持登录 YouTube。",
+      "该 YouTube 视频需要登录，或受年龄/地区限制。多数公开视频无需登录；Subquill 不支持登录 YouTube。",
     error_AUTH_REQUIRED: "需要配置 B 站 SESSDATA Cookie 才能获取字幕。",
     error_RATE_LIMITED: "B 站请求过于频繁，请稍后再试。",
     error_PART_OUT_OF_RANGE: "分 P 编号超出视频页数。",
@@ -185,7 +185,7 @@ const messages = {
     authPartialSuccess: "部分保存成功：请查看上方提示。",
   },
   en: {
-    appTitle: "OpenNote",
+    appTitle: "Subquill",
     navWorkspace: "Generate notes",
     navSettings: "Settings",
     navAbout: "About",
@@ -287,14 +287,14 @@ const messages = {
     segmentCount: "{count} subtitle segments",
     loading: "Loading…",
     loadSettingsFailed: "Failed to load settings.",
-    aboutTitle: "About OpenNote",
+    aboutTitle: "About Subquill",
     aboutDescription:
       "Desktop app that generates study notes from Bilibili / YouTube video subtitles.",
     aboutPlatformsTitle: "Supported platforms",
     aboutPlatforms: "Bilibili and YouTube (public captions).",
     aboutPrivacyTitle: "Privacy",
     aboutPrivacy:
-      "API keys and Bilibili cookies stay on this device. OpenNote does not upload them to its own servers. The cookie is sent only to Bilibili official APIs.",
+      "API keys and Bilibili cookies stay on this device. Subquill does not upload them to its own servers. The cookie is sent only to Bilibili official APIs.",
     aboutCookieTitle: "Cookie usage",
     aboutCookie:
       "Optional SESSDATA unlocks login-gated or AI captions on Bilibili. YouTube does not need a cookie.",
@@ -352,7 +352,7 @@ const messages = {
       "Fetched subtitles do not match the video duration (Bilibili AI captions may be wrong or incomplete). Retry later, or use a video with human-made captions.",
     error_VIDEO_NOT_FOUND: "Video not found.",
     error_VIDEO_RESTRICTED:
-      "This YouTube video requires sign-in or is age/region restricted. Most public videos need no login; OpenNote does not support YouTube accounts.",
+      "This YouTube video requires sign-in or is age/region restricted. Most public videos need no login; Subquill does not support YouTube accounts.",
     error_AUTH_REQUIRED: "A Bilibili SESSDATA cookie is required to fetch subtitles.",
     error_RATE_LIMITED: "Bilibili rate limit reached. Try again later.",
     error_PART_OUT_OF_RANGE: "The requested part number exceeds the video page count.",
