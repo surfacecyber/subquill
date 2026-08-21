@@ -58,6 +58,10 @@ export interface JobProgress {
   item_index?: number;
   item_total?: number;
   item_url?: string;
+  /** Accumulated note Markdown shown while the model is writing. */
+  draft_markdown?: string;
+  /** True while the model is reasoning and visible content is still empty. */
+  thinking?: boolean;
 }
 
 export interface JobResult {

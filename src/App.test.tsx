@@ -125,6 +125,23 @@ describe("App view persistence", () => {
     confirmSpy.mockRestore();
   });
 
+  it("keeps a window drag region during onboarding", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      ...completedSettings,
+      onboarding_completed: false,
+    });
+
+    const { container } = render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Initial setup" }),
+      ).toBeInTheDocument();
+    });
+
+    expect(container.querySelector("[data-tauri-drag-region]")).not.toBeNull();
+  });
+
   it("marks the active nav item with aria-current", async () => {
     const user = userEvent.setup();
     render(<App />);

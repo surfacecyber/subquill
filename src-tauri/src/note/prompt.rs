@@ -11,16 +11,22 @@ pub fn chunk_system_prompt(locale: NoteLocale) -> String {
     match locale {
         NoteLocale::Zh => {
             "你是学习笔记助手。只能根据提供的字幕片段生成笔记，不得编造事实。\
-             必须仅回复一个 JSON 对象，不要 markdown 代码块或其它文字。\
-             格式：{\"summary\":\"...\",\"sections\":[{\"start_ms\":0,\"end_ms\":1000,\"title\":\"...\",\"explanation\":\"...\"}]}。\
-             start_ms/end_ms 为整数毫秒，sections 按 start_ms 升序。"
+             不要输出思维过程，不要复述或粘贴完整字幕。\
+             直接按以下 Markdown 结构回复，不要用代码块包裹：\n\
+             ## 总结\n\n一段总述\n\n\
+             ## 分段讲解\n\n\
+             ### 小节标题（hh:mm:ss - hh:mm:ss）\n\n该段讲解正文\n\n\
+             时间必须来自字幕行的时间码，分段按时间升序。"
                 .to_string()
         }
         NoteLocale::En => {
             "You are a study-note assistant. Use only the provided subtitle lines; do not invent facts. \
-             Reply with a single JSON object only — no markdown fences or extra text. \
-             Schema: {\"summary\":\"...\",\"sections\":[{\"start_ms\":0,\"end_ms\":1000,\"title\":\"...\",\"explanation\":\"...\"}]}. \
-             Times are integer milliseconds; sections sorted by start_ms."
+             Do not output chain-of-thought. Do not repeat or paste the full transcript. \
+             Reply in this Markdown structure, with no code fences:\n\
+             ## Summary\n\nOverall summary\n\n\
+             ## Section breakdown\n\n\
+             ### Section title (hh:mm:ss - hh:mm:ss)\n\nExplanation\n\n\
+             Timestamps must come from the subtitle lines; sections sorted by start time."
                 .to_string()
         }
     }
@@ -109,32 +115,14 @@ pub fn truncate_for_fix_prompt(content: &str) -> String {
     )
 }
 
-pub fn chunk_fix_prompt(locale: NoteLocale, invalid_json: &str, reason: &str) -> String {
-    let clipped = truncate_for_fix_prompt(invalid_json);
-    match locale {
-        NoteLocale::Zh => format!(
-            "上一次回复无效（{}）。请仅修复 JSON 结构与字段约束，不要新增事实。\
-             无效内容：\n{}\n\
-             仍须返回单个 JSON 对象：{{\"summary\":\"...\",\"sections\":[...]}}。",
-            reason, clipped
-        ),
-        NoteLocale::En => format!(
-            "Previous reply was invalid ({}). Fix JSON structure and field constraints only; do not add new facts. \
-             Invalid content:\n{}\n\
-             Return one JSON object: {{\"summary\":\"...\",\"sections\":[...]}}.",
-            reason, clipped
-        ),
-    }
-}
-
 pub fn summary_merge_system_prompt(locale: NoteLocale) -> String {
     match locale {
         NoteLocale::Zh => "合并多段 partial summary，生成一段总结合并文本。不得新增事实。\
-             仅回复 JSON：{\"summary\":\"...\"}，不要其它文字。"
+             直接输出合并后的总结正文，不要标题、代码块或其它结构。"
             .to_string(),
         NoteLocale::En => {
             "Merge partial summaries into one overall summary. Do not add new facts. \
-             Reply with JSON only: {\"summary\":\"...\"}."
+             Reply with the merged summary prose only — no headings, fences, or extra structure."
                 .to_string()
         }
     }
@@ -156,13 +144,11 @@ pub fn summary_merge_fix_prompt(locale: NoteLocale, invalid_json: &str, reason: 
     let clipped = truncate_for_fix_prompt(invalid_json);
     match locale {
         NoteLocale::Zh => format!(
-            "合并 summary 的 JSON 无效（{}）。仅修复 JSON 结构，不要新增事实。无效内容：\n{}\n\
-             仍须返回：{{\"summary\":\"...\"}}。",
+            "合并 summary 无效（{}）。仅整理已有内容为一段总结，不要新增事实。无效内容：\n{}",
             reason, clipped
         ),
         NoteLocale::En => format!(
-            "Summary merge JSON was invalid ({}). Fix JSON structure only; do not add new facts. Invalid content:\n{}\n\
-             Return: {{\"summary\":\"...\"}}.",
+            "Summary merge was invalid ({}). Rewrite existing content as one summary; do not add new facts. Invalid content:\n{}",
             reason, clipped
         ),
     }
@@ -178,23 +164,6 @@ pub fn chunk_messages(
         ChatMessage::system(chunk_system_prompt(locale)),
         ChatMessage::user(chunk_user_prompt(metadata, chunk, locale, full_pass)),
     ]
-}
-
-pub fn chunk_fix_messages(
-    metadata: &VideoMetadata,
-    chunk: &SubtitleChunk,
-    locale: NoteLocale,
-    full_pass: bool,
-    invalid_json: &str,
-    reason: &str,
-) -> Vec<ChatMessage> {
-    let mut messages = chunk_messages(metadata, chunk, locale, full_pass);
-    messages.push(ChatMessage::user(chunk_fix_prompt(
-        locale,
-        invalid_json,
-        reason,
-    )));
-    messages
 }
 
 pub fn summary_merge_messages(partials: &[String], locale: NoteLocale) -> Vec<ChatMessage> {

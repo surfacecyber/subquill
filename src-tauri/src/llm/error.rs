@@ -19,6 +19,9 @@ pub enum LlmError {
 
     #[error("{message}")]
     InvalidResponse { message: String },
+
+    #[error("{message}")]
+    Cancelled { message: String },
 }
 
 impl LlmError {
@@ -30,6 +33,7 @@ impl LlmError {
             Self::Network { .. } => "LLM_NETWORK_ERROR",
             Self::Api { .. } => "LLM_API_ERROR",
             Self::InvalidResponse { .. } => "LLM_INVALID_RESPONSE",
+            Self::Cancelled { .. } => "JOB_CANCELLED",
         }
     }
 
@@ -65,6 +69,12 @@ impl LlmError {
 
     pub fn invalid_response(message: impl Into<String>) -> Self {
         Self::InvalidResponse {
+            message: message.into(),
+        }
+    }
+
+    pub fn cancelled(message: impl Into<String>) -> Self {
+        Self::Cancelled {
             message: message.into(),
         }
     }

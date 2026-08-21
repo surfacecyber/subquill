@@ -41,7 +41,7 @@ pub fn render_markdown(data: &NoteData, locale: NoteLocale) -> String {
     out
 }
 
-fn build_display_title(metadata: &super::types::VideoMetadata) -> String {
+pub(crate) fn build_display_title(metadata: &super::types::VideoMetadata) -> String {
     if let Some(part) = &metadata.part_title {
         format!("{} — {}", metadata.title, part)
     } else {

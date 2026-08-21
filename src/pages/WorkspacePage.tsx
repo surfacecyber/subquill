@@ -5,6 +5,7 @@ import { getAuthStatus, previewVideo, revealInFolder } from "../api/commands";
 import { exportJobMarkdown } from "../api/job";
 import { JobProgressDisplay } from "../components/JobProgressDisplay";
 import { SafeMarkdown } from "../components/SafeMarkdown";
+import { StreamingMarkdown } from "../components/StreamingMarkdown";
 import { useNoteJob } from "../hooks/useNoteJob";
 import type { UiLocale } from "../i18n";
 import { t, type MessageKey } from "../i18n";
@@ -137,6 +138,8 @@ export function WorkspacePage({
   const wasActiveRef = useRef(active);
   const skipPreviewDebounceRef = useRef(false);
   const lastAutoSavedPathRef = useRef<string | null>(null);
+  const userPickedBatchRef = useRef(false);
+  const previewScrollRef = useRef<HTMLDivElement | null>(null);
 
   function refreshPreviews() {
     skipPreviewDebounceRef.current = true;
@@ -157,12 +160,30 @@ export function WorkspacePage({
 
   const hasValidVideoUrl = parseVideoUrls(url).length > 0;
   const batchResults = result?.batch_results ?? [];
+  const runningItemIndex = isActive ? progress?.item_index : undefined;
+  const viewingRunningItem =
+    selectedBatchIndex === null || selectedBatchIndex === runningItemIndex;
+  const showLivePreview =
+    isActive &&
+    viewingRunningItem &&
+    Boolean(progress?.draft_markdown || progress?.thinking);
   const selectedBatchResult =
     selectedBatchIndex === null
       ? null
       : (batchResults.find((item) => item.index === selectedBatchIndex) ?? null);
-  const displayedNote: DisplayedNote | null =
-    toDisplayedNote(selectedBatchResult) ?? toDisplayedNote(result);
+  const displayedNote: DisplayedNote | null = showLivePreview
+    ? {
+        markdown: progress?.draft_markdown ?? "",
+        title:
+          urlPreviews.find((item) => item.url === progress?.item_url)?.preview
+            ?.title ??
+          progress?.item_url ??
+          t(locale, "previewTitle"),
+        bvid: "",
+        language: "",
+        segment_count: 0,
+      }
+    : (toDisplayedNote(selectedBatchResult) ?? toDisplayedNote(result));
 
   useEffect(() => {
     onJobActiveChange?.(isActive);
@@ -172,13 +193,28 @@ export function WorkspacePage({
   }, [isActive, onJobActiveChange]);
 
   useEffect(() => {
+    userPickedBatchRef.current = false;
+  }, [jobId]);
+
+  useEffect(() => {
+    if (isActive && !userPickedBatchRef.current && progress?.item_index !== undefined) {
+      setSelectedBatchIndex(progress.item_index);
+      return;
+    }
     if (!result) {
-      setSelectedBatchIndex(null);
+      if (!isActive) {
+        setSelectedBatchIndex(null);
+      }
       return;
     }
     const results = result.batch_results ?? [];
     if (results.length === 0) {
-      setSelectedBatchIndex(null);
+      if (!isActive) {
+        setSelectedBatchIndex(null);
+      }
+      return;
+    }
+    if (userPickedBatchRef.current) {
       return;
     }
     setSelectedBatchIndex((prev) => {
@@ -187,7 +223,14 @@ export function WorkspacePage({
       }
       return results[results.length - 1]?.index ?? null;
     });
-  }, [result]);
+  }, [isActive, progress?.item_index, result]);
+
+  useEffect(() => {
+    if (!showLivePreview || !previewScrollRef.current) {
+      return;
+    }
+    previewScrollRef.current.scrollTop = previewScrollRef.current.scrollHeight;
+  }, [showLivePreview, progress?.draft_markdown]);
 
   useEffect(() => {
     if (!active) {
@@ -359,6 +402,7 @@ export function WorkspacePage({
   const hasBatchResults = batchResults.length > 0;
   const showSaveDirGuide =
     Boolean(displayedNote) &&
+    !showLivePreview &&
     !notesSaveDir &&
     !displayedNote?.saved_path &&
     !dismissSaveGuide;
@@ -549,7 +593,10 @@ export function WorkspacePage({
                           className="batch-summary-select"
                           aria-pressed={isSelected}
                           aria-label={t(locale, "batchItemSelect")}
-                          onClick={() => setSelectedBatchIndex(item.index)}
+                          onClick={() => {
+                            userPickedBatchRef.current = true;
+                            setSelectedBatchIndex(item.index);
+                          }}
                         >
                           {content}
                         </button>
@@ -621,14 +668,23 @@ export function WorkspacePage({
           ) : null}
 
           {displayedNote ? (
-            <div className="preview-panel">
+            <div className={`preview-panel${showLivePreview ? " preview-panel-live" : ""}`}>
               <div className="preview-header">
                 <div className="preview-heading">
-                  <h2>{displayedNote.title || t(locale, "previewTitle")}</h2>
+                  <h2>
+                    {displayedNote.title || t(locale, "previewTitle")}
+                    {showLivePreview ? (
+                      <span className="preview-live-badge">
+                        {t(locale, "previewStreaming")}
+                      </span>
+                    ) : null}
+                  </h2>
                   <p className="muted preview-meta">
-                    {t(locale, "segmentCount", {
-                      count: displayedNote.segment_count,
-                    })}
+                    {showLivePreview
+                      ? t(locale, "previewStreamingHint")
+                      : t(locale, "segmentCount", {
+                          count: displayedNote.segment_count,
+                        })}
                   </p>
                 </div>
                 <div className="preview-actions">
@@ -645,6 +701,7 @@ export function WorkspacePage({
                     type="button"
                     className="btn-secondary"
                     onClick={() => void handleCopy()}
+                    disabled={showLivePreview}
                   >
                     {t(locale, "copyMarkdown")}
                   </button>
@@ -652,6 +709,7 @@ export function WorkspacePage({
                     type="button"
                     className="btn-secondary"
                     onClick={() => void handleExport()}
+                    disabled={showLivePreview}
                   >
                     {t(locale, "exportMarkdown")}
                   </button>
@@ -667,9 +725,18 @@ export function WorkspacePage({
                 </div>
               </div>
               <div
+                ref={previewScrollRef}
                 className={`preview-scroll markdown-preview${previewExpanded ? " preview-scroll-expanded" : ""}`}
               >
-                <SafeMarkdown markdown={displayedNote.markdown} />
+                {showLivePreview ? (
+                  <StreamingMarkdown
+                    markdown={displayedNote.markdown}
+                    thinking={progress?.thinking}
+                    thinkingLabel={t(locale, "progressThinking")}
+                  />
+                ) : (
+                  <SafeMarkdown markdown={displayedNote.markdown} />
+                )}
               </div>
             </div>
           ) : null}

@@ -66,6 +66,35 @@ pub struct NoteProgress {
     pub stage: NoteProgressStage,
     pub chunk_index: Option<usize>,
     pub chunk_count: usize,
+    pub draft_markdown: Option<String>,
+    pub thinking: bool,
+}
+
+impl NoteProgress {
+    pub fn new(
+        stage: NoteProgressStage,
+        chunk_index: Option<usize>,
+        chunk_count: usize,
+    ) -> Self {
+        Self {
+            stage,
+            chunk_index,
+            chunk_count,
+            draft_markdown: None,
+            thinking: false,
+        }
+    }
+
+    pub fn with_draft(mut self, markdown: impl Into<String>, thinking: bool) -> Self {
+        let markdown = markdown.into();
+        self.draft_markdown = if markdown.trim().is_empty() {
+            None
+        } else {
+            Some(markdown)
+        };
+        self.thinking = thinking;
+        self
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

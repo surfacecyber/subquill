@@ -87,6 +87,12 @@ pub struct JobProgress {
     pub item_total: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub item_url: Option<String>,
+    /// Accumulated note Markdown shown while the model is writing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub draft_markdown: Option<String>,
+    /// True while the model is reasoning and visible content is still empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<bool>,
 }
 
 impl JobProgress {
@@ -100,6 +106,8 @@ impl JobProgress {
             item_index: None,
             item_total: None,
             item_url: None,
+            draft_markdown: None,
+            thinking: None,
         }
     }
 
@@ -118,6 +126,12 @@ impl JobProgress {
         self.item_index = Some(item_index);
         self.item_total = Some(item_total);
         self.item_url = Some(item_url.to_string());
+        self
+    }
+
+    pub fn with_draft(mut self, markdown: Option<String>, thinking: bool) -> Self {
+        self.draft_markdown = markdown.filter(|text| !text.trim().is_empty());
+        self.thinking = if thinking { Some(true) } else { None };
         self
     }
 }

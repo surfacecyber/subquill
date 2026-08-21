@@ -82,7 +82,6 @@ function App() {
   } else {
     content = (
       <div className="app-layout">
-        <div className="titlebar-drag" data-tauri-drag-region aria-hidden="true" />
         <nav className="app-nav" aria-label={t(uiLocale, "navAriaLabel")}>
           <p className="nav-brand">
             <img
@@ -170,6 +169,7 @@ function App() {
 
   return (
     <NotificationProvider dismissLabel={t(uiLocale, "notificationDismiss")}>
+      <div className="titlebar-drag" data-tauri-drag-region aria-hidden="true" />
       {content}
     </NotificationProvider>
   );

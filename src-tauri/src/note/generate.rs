@@ -1,20 +1,19 @@
+use std::time::{Duration, Instant};
+
 use crate::bilibili::SubtitleSegment;
 use crate::llm::{LlmClient, LlmError};
 
-use super::chunk::{plan_chunks, segments_prompt_char_count};
+use super::chunk::plan_chunks;
 use super::error::{NoteError, NoteResult};
+use super::markdown::{build_display_title, escape_heading_text};
 use super::merge::{fallback_merge_summaries, merge_chunk_outputs, parse_summary_merge_output};
-use super::prompt::{
-    chunk_fix_messages, chunk_messages, summary_merge_fix_messages, summary_merge_messages,
-};
+use super::parse_md::parse_chunk_output;
+use super::prompt::{chunk_messages, summary_merge_fix_messages, summary_merge_messages};
 use super::types::{
     NoteData, NoteLocale, NoteProgress, NoteProgressStage, SubtitleChunk, VideoMetadata,
 };
-use super::validate::parse_and_validate_chunk_output;
 
-const MAX_TOKENS_MIN: u32 = 4_096;
-const MAX_TOKENS_MAX: u32 = 16_384;
-const SUMMARY_MERGE_MAX_TOKENS: u32 = 1_024;
+const DRAFT_EMIT_INTERVAL: Duration = Duration::from_millis(80);
 
 pub fn generate_note_data<T: crate::llm::HttpTransport>(
     client: &LlmClient<T>,
@@ -33,11 +32,11 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
     let chunk_count = chunks.len().max(1);
     let full_pass = chunks.len() == 1;
 
-    progress(NoteProgress {
-        stage: NoteProgressStage::Chunking,
-        chunk_index: None,
+    progress(NoteProgress::new(
+        NoteProgressStage::Chunking,
+        None,
         chunk_count,
-    });
+    ));
 
     if chunks.is_empty() {
         return Err(NoteError::Llm(LlmError::invalid_response(
@@ -46,23 +45,63 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
     }
 
     let mut chunk_outputs = Vec::with_capacity(chunks.len());
+    let mut completed_drafts: Vec<String> = Vec::new();
+    let mut last_draft = String::new();
 
     for chunk in &chunks {
         if cancellation_check() {
             return Err(NoteError::Cancelled);
         }
 
-        progress(NoteProgress {
-            stage: NoteProgressStage::AnalyzingChunk,
-            chunk_index: Some(chunk.index),
+        progress(NoteProgress::new(
+            NoteProgressStage::AnalyzingChunk,
+            Some(chunk.index),
             chunk_count,
-        });
+        ));
 
-        let output = analyze_chunk(client, &metadata, chunk, locale, duration_ms, full_pass)?;
+        let mut pump = DraftPump::new();
+        let output = analyze_chunk(
+            client,
+            &metadata,
+            chunk,
+            locale,
+            duration_ms,
+            full_pass,
+            &mut cancellation_check,
+            &mut |content, thinking| {
+                last_draft = compose_draft(
+                    &metadata,
+                    locale,
+                    &completed_drafts,
+                    chunk.index,
+                    chunk_count,
+                    content,
+                );
+                pump.emit(
+                    &mut progress,
+                    NoteProgressStage::AnalyzingChunk,
+                    Some(chunk.index),
+                    chunk_count,
+                    &last_draft,
+                    thinking,
+                    false,
+                );
+            },
+        )?;
+        pump.emit(
+            &mut progress,
+            NoteProgressStage::AnalyzingChunk,
+            Some(chunk.index),
+            chunk_count,
+            &last_draft,
+            false,
+            true,
+        );
         if cancellation_check() {
             return Err(NoteError::Cancelled);
         }
-        chunk_outputs.push(output);
+        completed_drafts.push(output.raw_markdown.clone());
+        chunk_outputs.push(output.parsed);
     }
 
     let (sections, partial_summaries) = merge_chunk_outputs(&chunk_outputs);
@@ -77,11 +116,10 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
             return Err(NoteError::Cancelled);
         }
 
-        progress(NoteProgress {
-            stage: NoteProgressStage::MergingSummaries,
-            chunk_index: None,
-            chunk_count,
-        });
+        progress(
+            NoteProgress::new(NoteProgressStage::MergingSummaries, None, chunk_count)
+                .with_draft(last_draft.clone(), false),
+        );
 
         let merged = merge_summaries(client, &partial_summaries, locale)?;
         if cancellation_check() {
@@ -94,11 +132,10 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
         return Err(NoteError::Cancelled);
     }
 
-    progress(NoteProgress {
-        stage: NoteProgressStage::Complete,
-        chunk_index: None,
-        chunk_count,
-    });
+    progress(
+        NoteProgress::new(NoteProgressStage::Complete, None, chunk_count)
+            .with_draft(last_draft, false),
+    );
 
     Ok(NoteData {
         metadata,
@@ -108,15 +145,9 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
     })
 }
 
-fn max_tokens_for_chunk(chunk: &SubtitleChunk) -> u32 {
-    let prompt_chars = segments_prompt_char_count(&chunk.segments);
-    // Longer transcripts need more room for section JSON; clamp to a safe range.
-    let estimated = (prompt_chars / 4) as u32;
-    estimated.clamp(MAX_TOKENS_MIN, MAX_TOKENS_MAX)
-}
-
-fn max_tokens_for_fix(base: u32) -> u32 {
-    base.saturating_mul(2).clamp(MAX_TOKENS_MIN, MAX_TOKENS_MAX)
+struct ChunkAnalysis {
+    parsed: super::types::ChunkLlmOutput,
+    raw_markdown: String,
 }
 
 fn analyze_chunk<T: crate::llm::HttpTransport>(
@@ -126,27 +157,21 @@ fn analyze_chunk<T: crate::llm::HttpTransport>(
     locale: NoteLocale,
     video_duration_ms: u64,
     full_pass: bool,
-) -> NoteResult<super::types::ChunkLlmOutput> {
-    let max_tokens = max_tokens_for_chunk(chunk);
+    cancellation_check: &mut impl FnMut() -> bool,
+    on_draft: &mut impl FnMut(&str, bool),
+) -> NoteResult<ChunkAnalysis> {
     let messages = chunk_messages(metadata, chunk, locale, full_pass);
     let content = client
-        .chat(messages, Some(max_tokens))
-        .map_err(NoteError::Llm)?;
+        .chat_stream(messages, |event| on_draft(&event.content, event.thinking), || {
+            cancellation_check()
+        })
+        .map_err(map_llm_error)?;
 
-    match parse_and_validate_chunk_output(&content, chunk, video_duration_ms) {
-        Ok(output) => Ok(output),
-        Err(first_err) => {
-            let reason = first_err.to_string();
-            let fix_max_tokens = max_tokens_for_fix(max_tokens);
-            let fix_messages =
-                chunk_fix_messages(metadata, chunk, locale, full_pass, &content, &reason);
-            let fixed_content = client
-                .chat(fix_messages, Some(fix_max_tokens))
-                .map_err(NoteError::Llm)?;
-            parse_and_validate_chunk_output(&fixed_content, chunk, video_duration_ms)
-                .map_err(NoteError::Llm)
-        }
-    }
+    let parsed = parse_chunk_output(&content, chunk, video_duration_ms).map_err(NoteError::Llm)?;
+    Ok(ChunkAnalysis {
+        parsed,
+        raw_markdown: content,
+    })
 }
 
 fn merge_summaries<T: crate::llm::HttpTransport>(
@@ -155,21 +180,19 @@ fn merge_summaries<T: crate::llm::HttpTransport>(
     locale: NoteLocale,
 ) -> NoteResult<String> {
     let messages = summary_merge_messages(partials, locale);
-    let content = client
-        .chat(messages, Some(SUMMARY_MERGE_MAX_TOKENS))
-        .map_err(NoteError::Llm)?;
+    let content = client.chat(messages).map_err(map_llm_error)?;
 
     match parse_summary_merge_output(&content) {
         Ok(summary) => Ok(summary),
         Err(first_err) if is_invalid_response(&first_err) => {
             let reason = first_err.to_string();
             let fix_messages = summary_merge_fix_messages(partials, locale, &content, &reason);
-            let fixed_content = match client.chat(fix_messages, Some(SUMMARY_MERGE_MAX_TOKENS)) {
+            let fixed_content = match client.chat(fix_messages) {
                 Ok(text) => text,
                 Err(retry_err) if is_invalid_response(&retry_err) => {
                     return Ok(fallback_merge_summaries(partials, locale));
                 }
-                Err(retry_err) => return Err(NoteError::Llm(retry_err)),
+                Err(retry_err) => return Err(map_llm_error(retry_err)),
             };
 
             parse_summary_merge_output(&fixed_content)
@@ -179,8 +202,84 @@ fn merge_summaries<T: crate::llm::HttpTransport>(
     }
 }
 
+fn map_llm_error(err: LlmError) -> NoteError {
+    if err.code() == "JOB_CANCELLED" {
+        NoteError::Cancelled
+    } else {
+        NoteError::Llm(err)
+    }
+}
+
 fn is_invalid_response(err: &LlmError) -> bool {
     err.code() == "LLM_INVALID_RESPONSE"
+}
+
+fn compose_draft(
+    metadata: &VideoMetadata,
+    locale: NoteLocale,
+    completed: &[String],
+    current_index: usize,
+    chunk_count: usize,
+    current: &str,
+) -> String {
+    let mut out = format!(
+        "# {}\n\n",
+        escape_heading_text(&build_display_title(metadata))
+    );
+
+    if chunk_count > 1 {
+        for (index, markdown) in completed.iter().enumerate() {
+            out.push_str(&chunk_part_heading(locale, index, chunk_count));
+            out.push_str(markdown.trim());
+            out.push_str("\n\n");
+        }
+        out.push_str(&chunk_part_heading(locale, current_index, chunk_count));
+    }
+
+    out.push_str(current);
+    out
+}
+
+fn chunk_part_heading(locale: NoteLocale, index: usize, chunk_count: usize) -> String {
+    match locale {
+        NoteLocale::Zh => format!("## 第 {} / {} 块\n\n", index + 1, chunk_count),
+        NoteLocale::En => format!("## Part {} / {}\n\n", index + 1, chunk_count),
+    }
+}
+
+struct DraftPump {
+    last_emit: Instant,
+    last_thinking: bool,
+}
+
+impl DraftPump {
+    fn new() -> Self {
+        Self {
+            last_emit: Instant::now() - DRAFT_EMIT_INTERVAL,
+            last_thinking: false,
+        }
+    }
+
+    fn emit(
+        &mut self,
+        progress: &mut impl FnMut(NoteProgress),
+        stage: NoteProgressStage,
+        chunk_index: Option<usize>,
+        chunk_count: usize,
+        draft: &str,
+        thinking: bool,
+        force: bool,
+    ) {
+        let thinking_changed = thinking != self.last_thinking;
+        if !force && !thinking_changed && self.last_emit.elapsed() < DRAFT_EMIT_INTERVAL {
+            return;
+        }
+        progress(
+            NoteProgress::new(stage, chunk_index, chunk_count).with_draft(draft, thinking),
+        );
+        self.last_emit = Instant::now();
+        self.last_thinking = thinking;
+    }
 }
 
 #[cfg(test)]
@@ -227,15 +326,22 @@ mod tests {
         .expect("client")
     }
 
+    fn en_note_md(summary: &str, title: &str, start: &str, end: &str, explanation: &str) -> String {
+        format!(
+            "## Summary\n\n{summary}\n\n## Section breakdown\n\n### {title} ({start} - {end})\n\n{explanation}\n"
+        )
+    }
+
     #[test]
     fn e2e_single_chunk_generation() {
-        let chunk_json = r#"{"summary":"overall","sections":[{"start_ms":1000,"end_ms":2000,"title":"Intro","explanation":"Says hi"}]}"#;
+        let chunk_md = en_note_md("overall", "Intro", "00:00:01", "00:00:02", "Says hi");
         let client =
-            client_from_responses(vec![MockResponse::success(success_chat_body(chunk_json))]);
+            client_from_responses(vec![MockResponse::success(success_chat_body(&chunk_md))]);
 
         let segments = vec![segment(1000, 2000, "hello world")];
         let meta = metadata(3000);
         let mut analyze_count = 0usize;
+        let mut saw_draft = false;
 
         let data = generate_note_data(
             &client,
@@ -247,12 +353,17 @@ mod tests {
                 if p.stage == NoteProgressStage::AnalyzingChunk {
                     analyze_count += 1;
                     assert_eq!(p.chunk_count, 1);
+                    if p.draft_markdown.as_ref().is_some_and(|md| md.contains("overall"))
+                    {
+                        saw_draft = true;
+                    }
                 }
             },
         )
         .expect("generate");
 
-        assert_eq!(analyze_count, 1);
+        assert!(analyze_count >= 1);
+        assert!(saw_draft);
         assert_eq!(data.summary, "overall");
         assert_eq!(data.segments, segments);
         assert_eq!(data.sections.len(), 1);
@@ -263,40 +374,34 @@ mod tests {
     }
 
     #[test]
-    fn max_tokens_scales_with_chunk_size() {
-        let small = SubtitleChunk {
-            index: 0,
-            start_ms: 0,
-            end_ms: 1000,
-            segments: vec![segment(0, 1000, "hi")],
-        };
-        assert_eq!(max_tokens_for_chunk(&small), MAX_TOKENS_MIN);
+    fn e2e_json_fallback_still_works() {
+        let chunk_json = r#"{"summary":"overall","sections":[{"start_ms":1000,"end_ms":2000,"title":"Intro","explanation":"Says hi"}]}"#;
+        let client =
+            client_from_responses(vec![MockResponse::success(success_chat_body(chunk_json))]);
 
-        let large = SubtitleChunk {
-            index: 0,
-            start_ms: 0,
-            end_ms: 1000,
-            segments: vec![segment(0, 1000, &"x".repeat(80_000))],
-        };
-        assert_eq!(max_tokens_for_chunk(&large), MAX_TOKENS_MAX);
-    }
+        let data = generate_note_data(
+            &client,
+            metadata(3000),
+            vec![segment(1000, 2000, "hello world")],
+            NoteLocale::En,
+            || false,
+            |_| {},
+        )
+        .expect("generate");
 
-    #[test]
-    fn fix_retry_raises_max_tokens() {
-        assert_eq!(max_tokens_for_fix(MAX_TOKENS_MIN), MAX_TOKENS_MIN * 2);
-        assert_eq!(max_tokens_for_fix(MAX_TOKENS_MAX), MAX_TOKENS_MAX);
-        assert_eq!(max_tokens_for_fix(10_000), MAX_TOKENS_MAX);
+        assert_eq!(data.summary, "overall");
+        assert_eq!(data.sections[0].title, "Intro");
     }
 
     #[test]
     fn e2e_multi_chunk_with_summary_merge() {
-        let chunk1 = r#"{"summary":"part one","sections":[{"start_ms":1000,"end_ms":2000,"title":"A","explanation":"first"}]}"#;
-        let chunk2 = r#"{"summary":"part two","sections":[{"start_ms":5000,"end_ms":6000,"title":"B","explanation":"second"}]}"#;
-        let merge = r#"{"summary":"merged overall"}"#;
+        let chunk1 = en_note_md("part one", "A", "00:00:01", "00:00:02", "first");
+        let chunk2 = en_note_md("part two", "B", "00:00:05", "00:00:06", "second");
+        let merge = "merged overall";
 
         let client = client_from_responses(vec![
-            MockResponse::success(success_chat_body(chunk1)),
-            MockResponse::success(success_chat_body(chunk2)),
+            MockResponse::success(success_chat_body(&chunk1)),
+            MockResponse::success(success_chat_body(&chunk2)),
             MockResponse::success(success_chat_body(merge)),
         ]);
 
@@ -323,26 +428,23 @@ mod tests {
     }
 
     #[test]
-    fn invalid_chunk_retries_once_then_fails() {
-        let bad = "not json";
-        let still_bad = r#"{"summary":"","sections":[]}"#;
-        let client = client_from_responses(vec![
-            MockResponse::success(success_chat_body(bad)),
-            MockResponse::success(success_chat_body(still_bad)),
-        ]);
+    fn unstructured_prose_still_generates() {
+        let client = client_from_responses(vec![MockResponse::success(success_chat_body(
+            "just some notes about the clip",
+        ))]);
 
-        let segments = vec![segment(1000, 2000, "x")];
-        let err = generate_note_data(
+        let data = generate_note_data(
             &client,
             metadata(3000),
-            segments,
+            vec![segment(1000, 2000, "x")],
             NoteLocale::En,
             || false,
             |_| {},
         )
-        .unwrap_err();
+        .expect("generate");
 
-        assert_eq!(err.code(), "LLM_INVALID_RESPONSE");
+        assert!(data.summary.contains("just some notes"));
+        assert_eq!(data.sections.len(), 1);
     }
 
     #[test]
@@ -353,7 +455,7 @@ mod tests {
         let client = client_from_responses(vec![
             MockResponse::success(success_chat_body(chunk1)),
             MockResponse::success(success_chat_body(chunk2)),
-            MockResponse::success(success_chat_body("not json")),
+            MockResponse::success(success_chat_body(r#"{"summary":""}"#)),
             MockResponse::success(success_chat_body(r#"{"summary":""}"#)),
         ]);
 
@@ -418,9 +520,9 @@ mod tests {
 
     #[test]
     fn cancellation_after_chunk_llm_call() {
-        let chunk_json = r#"{"summary":"overall","sections":[{"start_ms":1000,"end_ms":2000,"title":"Intro","explanation":"Says hi"}]}"#;
+        let chunk_md = en_note_md("overall", "Intro", "00:00:01", "00:00:02", "Says hi");
         let client =
-            client_from_responses(vec![MockResponse::success(success_chat_body(chunk_json))]);
+            client_from_responses(vec![MockResponse::success(success_chat_body(&chunk_md))]);
 
         let segments = vec![segment(1000, 2000, "hello world")];
         let meta = metadata(3000);

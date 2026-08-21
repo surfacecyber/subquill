@@ -161,6 +161,53 @@ describe("WorkspacePage", () => {
     });
   });
 
+  it("renders a live draft while the model is writing", async () => {
+    const unlisten = vi.fn();
+    vi.mocked(listenJobProgress).mockImplementation(async (handler) => {
+      handler({
+        job_id: "job-1",
+        stage: "calling_llm",
+        thinking: true,
+      });
+      handler({
+        job_id: "job-1",
+        stage: "calling_llm",
+        draft_markdown: "# Live\n\n## Summary\n\nHello draft",
+        thinking: false,
+      });
+      return unlisten;
+    });
+    vi.mocked(startNoteJob).mockResolvedValue({ job_id: "job-1" });
+    vi.mocked(getJobStatus).mockResolvedValue({
+      job_id: "job-1",
+      status: "running",
+      progress: {
+        job_id: "job-1",
+        stage: "calling_llm",
+        draft_markdown: "# Live\n\n## Summary\n\nHello draft",
+      },
+    });
+
+    const user = userEvent.setup();
+    renderWorkspace(<WorkspacePage locale="en" />);
+
+    await user.type(
+      screen.getByLabelText("Video URL"),
+      "https://www.bilibili.com/video/BV1xx",
+    );
+    await user.click(screen.getByRole("button", { name: "Generate notes" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/The note appears as it is written/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Hello draft")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Copy Markdown" }),
+      ).toBeDisabled();
+    });
+  });
+
   it("fetches result when job completes and shows metadata", async () => {
     const unlisten = vi.fn();
     vi.mocked(listenJobProgress).mockImplementation(async (handler) => {

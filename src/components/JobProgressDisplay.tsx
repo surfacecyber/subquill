@@ -85,6 +85,9 @@ export function JobProgressDisplay({
         </div>
       ) : null}
       {chunkLabel ? <p className="job-progress-chunk">{chunkLabel}</p> : null}
+      {isBusy && progress.thinking ? (
+        <p className="job-progress-thinking">{t(locale, "progressThinking")}</p>
+      ) : null}
       {isBusy ? (
         <p className="job-progress-eta muted-inline">
           {t(locale, "progressEtaHint")}

@@ -95,12 +95,14 @@ html {
 }
 
 .titlebar-drag {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: var(--titlebar-inset);
   z-index: 20;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .app-nav {
@@ -478,7 +480,8 @@ html {
 
 .job-progress-chunk,
 .job-progress-batch,
-.job-progress-cancel {
+.job-progress-cancel,
+.job-progress-thinking {
   margin: 6px 0 0;
   font-size: 0.92rem;
 }
@@ -691,6 +694,45 @@ html {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
+}
+
+.preview-live-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  color: var(--color-action);
+  background: color-mix(in srgb, var(--color-action) 14%, transparent);
+}
+
+.streaming-thinking {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.streaming-pending {
+  margin: 0.85em 0 0;
+  white-space: pre-wrap;
+}
+
+.streaming-caret {
+  display: inline-block;
+  width: 0.55ch;
+  height: 1em;
+  margin-left: 2px;
+  background: currentColor;
+  vertical-align: text-bottom;
+  animation: streaming-caret-blink 1s step-end infinite;
+}
+
+@keyframes streaming-caret-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .preview-header {

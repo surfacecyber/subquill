@@ -11,20 +11,10 @@ use super::bounded::{bytes_to_utf8_body, check_content_length, collect_bounded_b
 use super::error::{LlmError, Result};
 
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-pub const DEFAULT_TOTAL_TIMEOUT: Duration = Duration::from_secs(60);
-/// Floor / ceiling for per-request timeouts scaled by `max_tokens`.
-pub const MIN_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
-pub const MAX_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
+/// Client hang protection. Matches the per-item job deadline so a long
+/// generation is not cut off before the job itself times out.
+pub const DEFAULT_TOTAL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 pub const MAX_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
-
-/// Scale HTTP timeout with expected generation size (~20 tokens/sec + overhead).
-pub fn timeout_for_max_tokens(max_tokens: u32) -> Duration {
-    let secs = (u64::from(max_tokens) / 20).clamp(
-        MIN_REQUEST_TIMEOUT.as_secs(),
-        MAX_REQUEST_TIMEOUT.as_secs(),
-    );
-    Duration::from_secs(secs)
-}
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct HttpRequest {
@@ -59,6 +49,24 @@ impl HttpResponse {
 
 pub trait HttpTransport: Send + Sync {
     fn send(&self, request: HttpRequest) -> Result<HttpResponse>;
+
+    /// Stream a chat completion. Default implementation buffers via [`send`]
+    /// then replays the body as SSE events (JSON completions become one delta).
+    fn send_sse(
+        &self,
+        request: HttpRequest,
+        on_event: &mut dyn FnMut(&str) -> Result<()>,
+        cancelled: &mut dyn FnMut() -> bool,
+    ) -> Result<HttpResponse> {
+        if cancelled() {
+            return Err(LlmError::cancelled("Note generation was cancelled"));
+        }
+        let response = self.send(request)?;
+        if response.is_success() {
+            super::sse::replay_body_as_sse_events(&response.body, on_event)?;
+        }
+        Ok(response)
+    }
 }
 
 pub fn build_headers(api_key: &str) -> Result<HeaderMap> {
@@ -91,29 +99,56 @@ impl ReqwestTransport {
     pub fn with_defaults() -> Result<Self> {
         Self::new(DEFAULT_CONNECT_TIMEOUT, DEFAULT_TOTAL_TIMEOUT)
     }
-}
 
-impl HttpTransport for ReqwestTransport {
-    fn send(&self, request: HttpRequest) -> Result<HttpResponse> {
+    fn dispatch(&self, request: &HttpRequest) -> Result<reqwest::blocking::Response> {
         let headers = build_headers(&request.api_key)?;
 
         let mut builder = self
             .client
             .post(&request.url)
             .headers(headers)
-            .body(request.body);
+            .body(request.body.clone());
         if let Some(timeout) = request.timeout {
             builder = builder.timeout(timeout);
         }
 
-        let mut response = builder.send().map_err(map_reqwest_error)?;
+        builder.send().map_err(map_reqwest_error)
+    }
+}
 
+impl HttpTransport for ReqwestTransport {
+    fn send(&self, request: HttpRequest) -> Result<HttpResponse> {
+        let mut response = self.dispatch(&request)?;
         let status = response.status().as_u16();
         check_content_length(response.content_length())?;
-
         let body = read_bounded_response_body(&mut response)?;
-
         Ok(HttpResponse { status, body })
+    }
+
+    fn send_sse(
+        &self,
+        request: HttpRequest,
+        on_event: &mut dyn FnMut(&str) -> Result<()>,
+        cancelled: &mut dyn FnMut() -> bool,
+    ) -> Result<HttpResponse> {
+        if cancelled() {
+            return Err(LlmError::cancelled("Note generation was cancelled"));
+        }
+
+        let mut response = self.dispatch(&request)?;
+        let status = response.status().as_u16();
+
+        if !(200..300).contains(&status) {
+            check_content_length(response.content_length())?;
+            let body = read_bounded_response_body(&mut response)?;
+            return Ok(HttpResponse { status, body });
+        }
+
+        read_sse_response_body(&mut response, on_event, cancelled)?;
+        Ok(HttpResponse {
+            status,
+            body: String::new(),
+        })
     }
 }
 
@@ -127,6 +162,72 @@ fn read_bounded_response_body(response: &mut reqwest::blocking::Response) -> Res
 
     let bytes = collect_bounded_body(chunks)?;
     bytes_to_utf8_body(bytes)
+}
+
+fn read_sse_response_body(
+    response: &mut reqwest::blocking::Response,
+    on_event: &mut dyn FnMut(&str) -> Result<()>,
+    cancelled: &mut dyn FnMut() -> bool,
+) -> Result<()> {
+    let mut parser = super::sse::SseParser::new();
+    let mut total = 0usize;
+    let mut buf = [0u8; 8192];
+    let mut byte_leftover = Vec::new();
+    let mut saw_event = false;
+
+    loop {
+        if cancelled() {
+            return Err(LlmError::cancelled("Note generation was cancelled"));
+        }
+
+        let n = response
+            .read(&mut buf)
+            .map_err(|_| LlmError::network("LLM response read failed"))?;
+        if n == 0 {
+            break;
+        }
+
+        total = total.saturating_add(n);
+        if total > MAX_RESPONSE_BYTES {
+            return Err(LlmError::invalid_response(
+                "LLM response body exceeds size limit",
+            ));
+        }
+
+        byte_leftover.extend_from_slice(&buf[..n]);
+        let valid_up_to = match std::str::from_utf8(&byte_leftover) {
+            Ok(_) => byte_leftover.len(),
+            Err(err) => err.valid_up_to(),
+        };
+        if valid_up_to == 0 && byte_leftover.len() > 4 {
+            return Err(LlmError::invalid_response(
+                "LLM response body is not valid UTF-8",
+            ));
+        }
+
+        let chunk = std::str::from_utf8(&byte_leftover[..valid_up_to])
+            .map_err(|_| LlmError::invalid_response("LLM response body is not valid UTF-8"))?;
+        parser.push(chunk, &mut |payload| {
+            saw_event = true;
+            on_event(payload)
+        })?;
+        byte_leftover.drain(..valid_up_to);
+    }
+
+    if !byte_leftover.is_empty() {
+        return Err(LlmError::invalid_response(
+            "LLM response body is not valid UTF-8",
+        ));
+    }
+
+    if !saw_event {
+        let leftover = parser.leftover().to_string();
+        if leftover.trim().starts_with('{') {
+            return super::sse::replay_body_as_sse_events(&leftover, on_event);
+        }
+    }
+
+    parser.finish(on_event)
 }
 
 fn map_reqwest_error(err: reqwest::Error) -> LlmError {
@@ -236,14 +337,5 @@ pub mod mock {
         let debug = format!("{request:?}");
         assert!(!debug.contains("sk-secret-debug-key"));
         assert!(debug.contains(REDACTED));
-    }
-
-    #[test]
-    fn timeout_for_max_tokens_scales_and_clamps() {
-        assert_eq!(timeout_for_max_tokens(1_000), MIN_REQUEST_TIMEOUT); // 50 → 60
-        assert_eq!(timeout_for_max_tokens(4_096), Duration::from_secs(204)); // 4096/20
-        assert_eq!(timeout_for_max_tokens(2_000), Duration::from_secs(100));
-        assert_eq!(timeout_for_max_tokens(8_000), MAX_REQUEST_TIMEOUT); // 400 → 300
-        assert_eq!(timeout_for_max_tokens(16_384), MAX_REQUEST_TIMEOUT);
     }
 }

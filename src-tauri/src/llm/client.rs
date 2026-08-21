@@ -8,7 +8,10 @@ use super::error::{LlmError, Result};
 use super::http::{HttpRequest, HttpResponse, HttpTransport};
 use super::parse::extract_json_text;
 use super::sanitize::sanitize_api_error_message;
-use super::types::{ChatApiErrorBody, ChatCompletionRequest, ChatCompletionResponse, ChatMessage};
+use super::sse::{apply_chunk_payload, completion_message_content};
+use super::types::{
+    ChatApiErrorBody, ChatCompletionRequest, ChatMessage, ChatStreamEvent,
+};
 use super::validate::{validate_llm_base_url, validate_llm_model};
 
 /// Build `<base_url>/chat/completions` without duplicating path segments such as `/v1/v1`.
@@ -81,36 +84,106 @@ impl<T: HttpTransport> LlmClient<T> {
         &self.model
     }
 
-    pub fn chat(&self, messages: Vec<ChatMessage>, max_tokens: Option<u32>) -> Result<String> {
+    pub fn chat(&self, messages: Vec<ChatMessage>) -> Result<String> {
         let request = ChatCompletionRequest {
             model: self.model.clone(),
             messages,
-            max_tokens,
+            stream: false,
         };
 
         let body = serde_json::to_string(&request)
             .map_err(|_| LlmError::api("failed to encode chat request"))?;
 
-        let timeout = max_tokens.map(super::http::timeout_for_max_tokens);
-
         let response = self.transport.send(HttpRequest {
             url: self.endpoint.to_string(),
             body,
             api_key: self.api_key.clone(),
-            timeout,
+            timeout: None,
         })?;
 
         map_http_response(response, &self.api_key)
     }
 
-    /// Minimal connectivity check for settings UI — one token, JSON-only system prompt.
+    /// Stream a chat completion. `on_event` receives accumulated visible
+    /// content (not reasoning). Cancellation is checked on each SSE payload.
+    pub fn chat_stream(
+        &self,
+        messages: Vec<ChatMessage>,
+        mut on_event: impl FnMut(&ChatStreamEvent),
+        mut cancelled: impl FnMut() -> bool,
+    ) -> Result<String> {
+        let request = ChatCompletionRequest {
+            model: self.model.clone(),
+            messages,
+            stream: true,
+        };
+
+        let body = serde_json::to_string(&request)
+            .map_err(|_| LlmError::api("failed to encode chat request"))?;
+
+        let mut content = String::new();
+        let mut thinking = false;
+        let mut last_sig: Option<(usize, bool)> = None;
+
+        let response = self.transport.send_sse(
+            HttpRequest {
+                url: self.endpoint.to_string(),
+                body,
+                api_key: self.api_key.clone(),
+                timeout: None,
+            },
+            &mut |payload| {
+                apply_chunk_payload(&mut content, &mut thinking, payload)?;
+                let visible_thinking = thinking && content.is_empty();
+                let sig = (content.len(), visible_thinking);
+                if last_sig != Some(sig) {
+                    on_event(&ChatStreamEvent {
+                        content: content.clone(),
+                        thinking: visible_thinking,
+                    });
+                    last_sig = Some(sig);
+                }
+                Ok(())
+            },
+            &mut cancelled,
+        )?;
+
+        if cancelled() {
+            return Err(LlmError::cancelled("Note generation was cancelled"));
+        }
+
+        if !response.is_success() {
+            return map_http_response(response, &self.api_key).map(|_| String::new());
+        }
+
+        if content.trim().is_empty() {
+            if let Some(fallback) = completion_message_content(&response.body) {
+                content = fallback;
+                on_event(&ChatStreamEvent {
+                    content: content.clone(),
+                    thinking: false,
+                });
+            }
+        }
+
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            return Err(LlmError::invalid_response(
+                "LLM response missing message content",
+            ));
+        }
+
+        Ok(trimmed.to_string())
+    }
+
+    /// Minimal connectivity check for settings UI — JSON-only system prompt.
     pub fn test_connection(&self) -> Result<()> {
         let messages = vec![
             ChatMessage::system("Reply with a JSON object only: {\"ok\":true}. No other text."),
             ChatMessage::user("ping"),
         ];
 
-        let content = self.chat(messages, Some(16))?;
+        let content = self.chat(messages)?;
         let json_text = extract_json_text(&content)?;
         let parsed: serde_json::Value = serde_json::from_str(&json_text)
             .map_err(|_| LlmError::invalid_response("test response is not valid JSON"))?;
@@ -138,19 +211,11 @@ fn map_http_response(response: HttpResponse, api_key: &str) -> Result<String> {
         return Err(LlmError::api(message));
     }
 
-    let payload: ChatCompletionResponse = serde_json::from_str(&response.body).map_err(|_| {
-        LlmError::invalid_response("LLM response is not valid chat completion JSON")
+    let content = completion_message_content(&response.body).ok_or_else(|| {
+        LlmError::invalid_response("LLM response missing message content")
     })?;
 
-    let content = payload
-        .choices
-        .first()
-        .and_then(|choice| choice.message.content.as_ref())
-        .map(|text| text.trim())
-        .filter(|text| !text.is_empty())
-        .ok_or_else(|| LlmError::invalid_response("LLM response missing message content"))?;
-
-    Ok(content.to_string())
+    Ok(content)
 }
 
 fn parse_api_error_message(body: &str, api_key: &str) -> Option<String> {
@@ -234,7 +299,7 @@ mod tests {
         )
         .with_status(401)]);
         let err = client
-            .chat(vec![ChatMessage::user("hi")], None)
+            .chat(vec![ChatMessage::user("hi")])
             .unwrap_err();
         assert_eq!(err.code(), "LLM_AUTH_ERROR");
     }
@@ -243,7 +308,7 @@ mod tests {
     fn maps_429_to_rate_limited() {
         let client = client_with_mock(vec![MockResponse::success("").with_status(429)]);
         let err = client
-            .chat(vec![ChatMessage::user("hi")], None)
+            .chat(vec![ChatMessage::user("hi")])
             .unwrap_err();
         assert_eq!(err.code(), "LLM_RATE_LIMITED");
     }
@@ -255,7 +320,7 @@ mod tests {
         )
         .with_status(400)]);
         let err = client
-            .chat(vec![ChatMessage::user("hi")], None)
+            .chat(vec![ChatMessage::user("hi")])
             .unwrap_err();
         assert_eq!(err.code(), "LLM_API_ERROR");
         assert_eq!(err.to_string(), "model not found");
@@ -279,7 +344,7 @@ mod tests {
         .expect("client");
 
         let err = client
-            .chat(vec![ChatMessage::user("hi")], None)
+            .chat(vec![ChatMessage::user("hi")])
             .unwrap_err();
         assert_eq!(err.code(), "LLM_API_ERROR");
         assert!(!err.to_string().contains(secret));
@@ -289,15 +354,54 @@ mod tests {
     #[test]
     fn extracts_message_content() {
         let client = client_with_mock(vec![MockResponse::success(success_body(r#"{"ok":true}"#))]);
-        let content = client.chat(vec![ChatMessage::user("hi")], None).unwrap();
+        let content = client.chat(vec![ChatMessage::user("hi")]).unwrap();
         assert_eq!(content, r#"{"ok":true}"#);
+    }
+
+    #[test]
+    fn chat_stream_replays_buffered_json_and_sets_stream_flag() {
+        let (transport, requests_log) = crate::llm::http::mock::MockTransport::new(vec![
+            MockResponse::success(success_body("## Summary\n\nHello")),
+        ]);
+        let client = LlmClient::new(
+            LlmClientConfig {
+                base_url: "https://api.openai.com/v1".to_string(),
+                api_key: "sk-test".to_string(),
+                model: "test-model".to_string(),
+            },
+            transport,
+        )
+        .expect("client");
+
+        let mut events = Vec::new();
+        let content = client
+            .chat_stream(
+                vec![ChatMessage::user("hi")],
+                |event| events.push(event.clone()),
+                || false,
+            )
+            .unwrap();
+
+        assert_eq!(content, "## Summary\n\nHello");
+        assert_eq!(events.last().map(|e| e.content.as_str()), Some("## Summary\n\nHello"));
+        let requests = requests_log.lock().expect("lock").clone();
+        assert!(requests[0].body.contains("\"stream\":true"));
+    }
+
+    #[test]
+    fn chat_stream_cancel_before_send() {
+        let client = client_with_mock(vec![MockResponse::success(success_body("hi"))]);
+        let err = client
+            .chat_stream(vec![ChatMessage::user("hi")], |_| {}, || true)
+            .unwrap_err();
+        assert_eq!(err.code(), "JOB_CANCELLED");
     }
 
     #[test]
     fn rejects_empty_choices() {
         let client = client_with_mock(vec![MockResponse::success(r#"{"choices":[]}"#)]);
         let err = client
-            .chat(vec![ChatMessage::user("hi")], None)
+            .chat(vec![ChatMessage::user("hi")])
             .unwrap_err();
         assert_eq!(err.code(), "LLM_INVALID_RESPONSE");
     }
@@ -330,7 +434,7 @@ mod tests {
         .expect("client");
 
         let err = client
-            .chat(vec![ChatMessage::user("hi")], None)
+            .chat(vec![ChatMessage::user("hi")])
             .unwrap_err();
         assert_eq!(err.code(), "LLM_TIMEOUT");
 
@@ -352,7 +456,7 @@ mod tests {
         .expect("client");
 
         let err = client
-            .chat(vec![ChatMessage::user("hi")], None)
+            .chat(vec![ChatMessage::user("hi")])
             .unwrap_err();
         assert_eq!(err.code(), "LLM_NETWORK_ERROR");
     }
@@ -377,5 +481,7 @@ mod tests {
         let requests = requests_log.lock().expect("lock").clone();
         assert_eq!(requests.len(), 1);
         assert!(!requests[0].body.contains("sk-secret-key"));
+        assert!(!requests[0].body.contains("max_tokens"));
+        assert!(!requests[0].body.contains("thinking"));
     }
 }

@@ -3,6 +3,7 @@ mod error;
 mod generate;
 mod markdown;
 mod merge;
+mod parse_md;
 mod prompt;
 mod save;
 mod types;

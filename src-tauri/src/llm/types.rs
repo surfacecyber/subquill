@@ -22,12 +22,16 @@ impl ChatMessage {
     }
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ChatCompletionRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub stream: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,6 +47,35 @@ pub struct ChatChoice {
 #[derive(Debug, Deserialize)]
 pub struct ChatChoiceMessage {
     pub content: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatStreamEvent {
+    /// Accumulated assistant `content` (never includes reasoning / CoT).
+    pub content: String,
+    /// True while the model is reasoning and the visible note is still empty.
+    pub thinking: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChatCompletionChunk {
+    #[serde(default)]
+    pub choices: Vec<ChatCompletionChunkChoice>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ChatCompletionChunkChoice {
+    #[serde(default)]
+    pub delta: ChatCompletionDelta,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ChatCompletionDelta {
+    pub content: Option<String>,
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
+    #[serde(default)]
+    pub reasoning: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

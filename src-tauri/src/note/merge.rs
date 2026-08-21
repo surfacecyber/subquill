@@ -45,17 +45,46 @@ struct SummaryOnly {
 }
 
 pub fn parse_summary_merge_output(content: &str) -> Result<String, crate::llm::LlmError> {
-    let json_text = crate::llm::extract_json_text(content)?;
-    let raw: SummaryOnly = serde_json::from_str(&json_text).map_err(|_| {
-        crate::llm::LlmError::invalid_response("summary merge output is not valid JSON")
-    })?;
-    let summary = raw.summary.trim();
+    let text = super::parse_md::unwrap_markdown_fence(content);
+    if text.trim().is_empty() {
+        return Err(crate::llm::LlmError::invalid_response(
+            "merged summary must not be empty",
+        ));
+    }
+
+    if text.trim_start().starts_with('{') {
+        if let Ok(json_text) = crate::llm::extract_json_text(text) {
+            if let Ok(raw) = serde_json::from_str::<SummaryOnly>(&json_text) {
+                let summary = raw.summary.trim();
+                if summary.is_empty() {
+                    return Err(crate::llm::LlmError::invalid_response(
+                        "merged summary must not be empty",
+                    ));
+                }
+                return Ok(summary.to_string());
+            }
+        }
+    }
+
+    let summary = extract_merged_summary_text(text);
     if summary.is_empty() {
         return Err(crate::llm::LlmError::invalid_response(
             "merged summary must not be empty",
         ));
     }
-    Ok(summary.to_string())
+    Ok(summary)
+}
+
+fn extract_merged_summary_text(text: &str) -> String {
+    let mut lines = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') {
+            continue;
+        }
+        lines.push(line);
+    }
+    lines.join("\n").trim().to_string()
 }
 
 /// Deterministic fallback when LLM summary merge cannot be validated.

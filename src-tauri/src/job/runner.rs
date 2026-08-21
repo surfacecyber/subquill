@@ -362,7 +362,9 @@ fn map_note_progress(job_id: Uuid, progress: NoteProgress) -> JobProgress {
         NoteProgressStage::Complete => JobProgressStage::Rendering,
     };
 
-    JobProgress::new(job_id, stage).with_chunks(progress.chunk_index, progress.chunk_count)
+    JobProgress::new(job_id, stage)
+        .with_chunks(progress.chunk_index, progress.chunk_count)
+        .with_draft(progress.draft_markdown, progress.thinking)
 }
 
 fn map_interrupted_generation_error(
