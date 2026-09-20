@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { getSettings } from "./api/commands";
-import { UpdateBanner } from "./components/UpdateBanner";
-import { useAppUpdater } from "./hooks/useAppUpdater";
 import { resolveUiLocale, t } from "./i18n";
 import { NotificationProvider } from "./notifications/NotificationProvider";
 import { AboutPage } from "./pages/AboutPage";
@@ -30,7 +28,6 @@ function App() {
   }, []);
 
   const uiLocale = settings ? resolveUiLocale(settings.locale) : "en";
-  const updater = useAppUpdater({ autoCheck: true });
 
   useEffect(() => {
     document.documentElement.lang = uiLocale === "zh" ? "zh-CN" : "en";
@@ -129,15 +126,6 @@ function App() {
         </nav>
 
         <main className="app-main">
-          <UpdateBanner
-            locale={uiLocale}
-            state={updater.state}
-            deferred={jobActive}
-            onInstall={() => {
-              void updater.installUpdate();
-            }}
-            onDismiss={updater.dismissAvailable}
-          />
           <div
             className="view-panel"
             hidden={view !== "workspace"}
@@ -160,9 +148,7 @@ function App() {
               onDirtyChange={setSettingsDirty}
             />
           ) : null}
-          {view === "about" ? (
-            <AboutPage locale={uiLocale} updater={updater} />
-          ) : null}
+          {view === "about" ? <AboutPage locale={uiLocale} /> : null}
         </main>
       </div>
     );

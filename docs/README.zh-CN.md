@@ -7,7 +7,7 @@
 | 文档 | 读者 | 说明 |
 | --- | --- | --- |
 | [IMPLEMENTATION_PLAN.zh-CN.md](IMPLEMENTATION_PLAN.zh-CN.md) | 贡献者 | 架构、安全边界、模块状态、错误码 |
-| [RELEASING.zh-CN.md](RELEASING.zh-CN.md) | 维护者 | GitHub Actions 发布、更新器密钥、版本管理 |
+| [RELEASING.zh-CN.md](RELEASING.zh-CN.md) | 维护者 | 源码分发与版本管理 |
 
 英文原文：[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)、[RELEASING.md](RELEASING.md)。
 

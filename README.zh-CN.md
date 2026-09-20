@@ -36,7 +36,7 @@ Vite 开发服务器监听 **1420** 端口。Tauri 窗口约 **960×700**。
 - 安全 Markdown 预览（不渲染原始 HTML）、复制、通过系统对话框导出 `.md`
 - 可选笔记保存目录：自动将生成的 Markdown 写入所选文件夹
 - 设置：更新配置、测试连接、清除已保存的 B 站 Cookie
-- 关于：应用名、版本、手动检查更新及实时状态
+- 关于：应用名、版本、源码仓库链接
 - 界面语言：`zh` / `en` / 跟随系统
 
 **平台说明**
@@ -69,15 +69,20 @@ npm run tauri build
 | --- | --- |
 | [docs/README.zh-CN.md](docs/README.zh-CN.md) | 文档索引 |
 | [实现计划](docs/IMPLEMENTATION_PLAN.zh-CN.md) | 架构、安全边界、模块说明 |
-| [发布说明](docs/RELEASING.zh-CN.md) | GitHub Actions 发布与 Tauri 更新器 |
+| [发布说明](docs/RELEASING.zh-CN.md) | 版本管理与源码分发 |
 
 面向 AI 工具的仓库指引见英文版 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)（未另做中文镜像）。
 
 ## 分发说明
 
-- **代码签名**：内部测试构建通常未签名。macOS Gatekeeper 与 Windows SmartScreen 可能在首次打开时提示。
-- **自动更新**：更新器代码已接入。正式发布构建需要 GitHub 远程、仓库 Secrets，以及非草稿的 `/releases/latest`。详见 [docs/RELEASING.zh-CN.md](docs/RELEASING.zh-CN.md)。
-- **本地构建**：不配置更新器 Secrets 也可执行 `npm run tauri build`；应用会提示当前构建未配置自动更新。
+Subquill **仅提供源码**，不提供预编译安装包。克隆仓库后本地构建：
+
+```bash
+npm install
+npm run tauri build
+```
+
+不发布 DMG、NSIS、EXE 等安装包。版本管理见 [docs/RELEASING.zh-CN.md](docs/RELEASING.zh-CN.md)。
 
 ## 贡献
 
