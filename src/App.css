@@ -774,29 +774,6 @@ html {
   margin-top: 20px;
 }
 
-.update-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 16px;
-  margin-bottom: 20px;
-  padding: 12px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--color-decorative-accent) 12%, var(--color-surface));
-}
-
-.update-banner-text {
-  margin: 0;
-}
-
-.update-banner-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 @media (max-width: 720px) {
   .app-layout {
     grid-template-columns: 1fr;
