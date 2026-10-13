@@ -1,22 +1,19 @@
 import { useEffect, useState } from "react";
 
 import { getAppInfo } from "../api/commands";
-import { updaterStatusLabel } from "../components/UpdateBanner";
-import type { AppUpdaterController } from "../hooks/useAppUpdater";
 import type { UiLocale } from "../i18n";
 import { t } from "../i18n";
 import pkg from "../../package.json";
 
 const FALLBACK_VERSION = pkg.version;
+const REPO_URL = "https://github.com/xuedongxue/subquill";
 
 interface AboutPageProps {
   locale: UiLocale;
-  updater: AppUpdaterController;
 }
 
-export function AboutPage({ locale, updater }: AboutPageProps) {
+export function AboutPage({ locale }: AboutPageProps) {
   const [version, setVersion] = useState(FALLBACK_VERSION);
-  const { state, isBusy, checkForUpdates, installUpdate } = updater;
 
   useEffect(() => {
     void getAppInfo()
@@ -42,16 +39,16 @@ export function AboutPage({ locale, updater }: AboutPageProps) {
           <dt>{t(locale, "version")}</dt>
           <dd>{version}</dd>
         </div>
-        <div className="about-row">
-          <dt>{t(locale, "updaterStatus")}</dt>
-          <dd aria-live="polite">{updaterStatusLabel(locale, state)}</dd>
-        </div>
       </dl>
 
       <div className="about-sections">
         <section className="about-section" aria-labelledby="about-platforms">
           <h2 id="about-platforms">{t(locale, "aboutPlatformsTitle")}</h2>
           <p className="muted">{t(locale, "aboutPlatforms")}</p>
+        </section>
+        <section className="about-section" aria-labelledby="about-updates">
+          <h2 id="about-updates">{t(locale, "aboutUpdatesTitle")}</h2>
+          <p className="muted">{t(locale, "aboutUpdates")}</p>
         </section>
         <section className="about-section" aria-labelledby="about-privacy">
           <h2 id="about-privacy">{t(locale, "aboutPrivacyTitle")}</h2>
@@ -64,28 +61,14 @@ export function AboutPage({ locale, updater }: AboutPageProps) {
       </div>
 
       <div className="about-actions">
-        <button
-          type="button"
+        <a
           className="btn-secondary"
-          disabled={isBusy}
-          onClick={() => {
-            void checkForUpdates();
-          }}
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
         >
-          {t(locale, "updaterCheckNow")}
-        </button>
-        {state.phase === "available" ? (
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={isBusy}
-            onClick={() => {
-              void installUpdate();
-            }}
-          >
-            {t(locale, "updaterInstall")}
-          </button>
-        ) : null}
+          {t(locale, "aboutSourceRepo")}
+        </a>
       </div>
     </section>
   );

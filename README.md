@@ -36,7 +36,7 @@ The Vite dev server listens on port **1420**. The Tauri window opens at about **
 - Safe Markdown preview (no raw HTML), copy to clipboard, export `.md` via native save dialog
 - Optional notes save folder: auto-write generated Markdown into a chosen directory
 - Settings: update configuration, test connection, clear saved Bilibili cookie
-- About: app name, version, manual update checks with live status
+- About: app name, version, link to the source repository
 - UI locales: `zh` / `en` / follow system
 
 **Platform notes**
@@ -69,15 +69,20 @@ npm run tauri build
 | --- | --- |
 | [docs/README.md](docs/README.md) | Documentation index |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Architecture, security, modules |
-| [Releasing](docs/RELEASING.md) | GitHub Actions releases and Tauri updater |
+| [Releasing](docs/RELEASING.md) | Versioning and source-only distribution |
 
 Agent guidance for AI tools: [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md).
 
 ## Distribution
 
-- **Code signing**: Installers are not signed for internal beta. macOS Gatekeeper and Windows SmartScreen may warn on first open.
-- **Auto-update**: Updater code is integrated. Published release builds need a GitHub remote, repository secrets, and a non-draft `/releases/latest` release. See [docs/RELEASING.md](docs/RELEASING.md).
-- **Local builds**: `npm run tauri build` works without updater secrets; the app reports that auto-update is not configured.
+Subquill is **source-only**. Clone the repository, install dependencies, and build locally:
+
+```bash
+npm install
+npm run tauri build
+```
+
+No pre-built installers (DMG, NSIS, EXE) are published. See [docs/RELEASING.md](docs/RELEASING.md) for versioning.
 
 ## Contributing
 
