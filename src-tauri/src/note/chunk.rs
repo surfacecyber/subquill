@@ -56,7 +56,7 @@ pub(crate) fn ends_complete_sentence(text: &str) -> bool {
     });
     matches!(
         stripped.chars().last(),
-        Some('。' | '！' | '？' | '.' | '!' | '?' | '…' | '；' | ';')
+        Some('。' | '！' | '？' | '.' | '!' | '?' | '…')
     )
 }
 
