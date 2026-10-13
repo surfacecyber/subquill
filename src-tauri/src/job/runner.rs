@@ -152,6 +152,10 @@ fn finalize_batch_success(app: &AppHandle, manager: &JobManager, job_id: Uuid) {
 }
 
 fn finalize_failure(app: &AppHandle, manager: &JobManager, job_id: Uuid, error: ErrorPayload) {
+    eprintln!(
+        "Subquill job {job_id} failed: {} {}",
+        error.code, error.message
+    );
     if let Ok(transition) = manager.fail(job_id, error) {
         emit_progress(app, &transition.progress);
     }

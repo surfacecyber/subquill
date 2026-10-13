@@ -18,7 +18,7 @@ function App() {
   const [loadError, setLoadError] = useState(false);
   const [view, setView] = useState<AppView>("workspace");
   const [settingsDirty, setSettingsDirty] = useState(false);
-  const [jobActive, setJobActive] = useState(false);
+  const [, setJobActive] = useState(false);
 
   useEffect(() => {
     void getSettings()

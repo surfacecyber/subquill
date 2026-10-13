@@ -1,6 +1,7 @@
+use super::chunk::ends_complete_sentence;
 use super::types::{ChunkLlmOutput, NoteSection};
 
-/// Merge chunk outputs: concatenate sections, sort, and deduplicate exact overlaps.
+/// Merge chunk outputs: concatenate sections, sort, and collapse overlapping spans.
 pub fn merge_chunk_outputs(outputs: &[ChunkLlmOutput]) -> (Vec<NoteSection>, Vec<String>) {
     let mut sections: Vec<NoteSection> = outputs
         .iter()
@@ -18,13 +19,8 @@ fn dedupe_sections(sections: Vec<NoteSection>) -> Vec<NoteSection> {
     let mut deduped = Vec::new();
     for section in sections {
         if let Some(last) = deduped.last_mut() {
-            if sections_same_span_title(last, &section) {
-                // Keep the richer explanation when chunk boundaries overlap.
-                if section.explanation.trim().chars().count()
-                    > last.explanation.trim().chars().count()
-                {
-                    last.explanation = section.explanation;
-                }
+            if should_merge_sections(last, &section) {
+                *last = merge_section_pair(last.clone(), section);
                 continue;
             }
         }
@@ -33,10 +29,66 @@ fn dedupe_sections(sections: Vec<NoteSection>) -> Vec<NoteSection> {
     deduped
 }
 
+fn should_merge_sections(a: &NoteSection, b: &NoteSection) -> bool {
+    if sections_same_span_title(a, b) {
+        return true;
+    }
+    let overlap = overlap_ms(a, b);
+    if overlap == 0 {
+        return false;
+    }
+    titles_similar(a, b) || overlap * 2 >= shorter_span_ms(a, b)
+}
+
+fn merge_section_pair(a: NoteSection, b: NoteSection) -> NoteSection {
+    NoteSection {
+        start_ms: a.start_ms.min(b.start_ms),
+        end_ms: a.end_ms.max(b.end_ms),
+        title: prefer_title(&a.title, &b.title),
+        explanation: prefer_explanation(&a.explanation, &b.explanation),
+    }
+}
+
+fn prefer_title(a: &str, b: &str) -> String {
+    if a.trim().chars().count() >= b.trim().chars().count() {
+        a.trim().to_string()
+    } else {
+        b.trim().to_string()
+    }
+}
+
+fn prefer_explanation(a: &str, b: &str) -> String {
+    let a_complete = ends_complete_sentence(a);
+    let b_complete = ends_complete_sentence(b);
+    match (a_complete, b_complete) {
+        (true, false) => a.trim().to_string(),
+        (false, true) => b.trim().to_string(),
+        _ if b.trim().chars().count() > a.trim().chars().count() => b.trim().to_string(),
+        _ => a.trim().to_string(),
+    }
+}
+
+fn overlap_ms(a: &NoteSection, b: &NoteSection) -> u64 {
+    let start = a.start_ms.max(b.start_ms);
+    let end = a.end_ms.min(b.end_ms);
+    end.saturating_sub(start)
+}
+
+fn shorter_span_ms(a: &NoteSection, b: &NoteSection) -> u64 {
+    a.end_ms
+        .saturating_sub(a.start_ms)
+        .min(b.end_ms.saturating_sub(b.start_ms))
+        .max(1)
+}
+
+fn titles_similar(a: &NoteSection, b: &NoteSection) -> bool {
+    a.title.trim().eq_ignore_ascii_case(b.title.trim())
+}
+
 fn sections_same_span_title(a: &NoteSection, b: &NoteSection) -> bool {
     a.start_ms == b.start_ms
         && a.end_ms == b.end_ms
-        && a.title.trim().eq_ignore_ascii_case(b.title.trim())
+        && titles_similar(a, b)
 }
 
 #[derive(Debug, serde::Deserialize)]

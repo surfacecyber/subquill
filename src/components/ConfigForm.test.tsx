@@ -20,6 +20,7 @@ vi.mock("../api/job", () => ({
 
 import { getAuthStatus, pickNotesSaveDir, saveAuth, saveSettings } from "../api/commands";
 import { testLlm } from "../api/job";
+import type { SettingsView } from "../types/settings";
 
 const baseSettings = {
   version: 1,
@@ -186,7 +187,7 @@ describe("ConfigForm", () => {
     }));
 
     function Harness() {
-      const [settings, setSettings] = useState({
+      const [settings, setSettings] = useState<SettingsView>({
         ...baseSettings,
         onboarding_completed: true,
       });

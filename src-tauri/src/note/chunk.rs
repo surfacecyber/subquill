@@ -2,30 +2,108 @@ use crate::bilibili::SubtitleSegment;
 
 use super::types::SubtitleChunk;
 
-/// Prefer a single LLM pass when total subtitle prompt lines fit under this limit.
-/// Sized for CJK-dense transcripts (~1 char ≈ 1 token) plus room for system/output
-/// on common 32k–64k context models.
+#[allow(dead_code)]
 pub const SINGLE_PASS_CHAR_LIMIT: usize = 24_000;
 
-/// Per-chunk character budget used only when content exceeds [`SINGLE_PASS_CHAR_LIMIT`].
+#[allow(dead_code)]
 pub const LARGE_CHUNK_CHAR_BUDGET: usize = 12_000;
 
-/// Plan chunks: single pass under the limit; otherwise split into large chunks.
+#[allow(dead_code)]
+pub const CHUNK_OVERLAP_CHAR_BUDGET: usize = 1_200;
+
+/// Join adjacent cues into one analysis line when the gap is at most this long.
+const JOIN_MAX_GAP_MS: u64 = 2_500;
+
+/// Cap on a joined analysis line so one run-on caption cannot swallow a whole chunk.
+const JOIN_MAX_CHARS: usize = 480;
+
+/// Send the whole transcript in one prompt. If the model stops early,
+/// [`super::generate::generate_note_data`] continues from the leftover time.
 pub fn plan_chunks(segments: &[SubtitleSegment]) -> Vec<SubtitleChunk> {
     if segments.is_empty() {
         return Vec::new();
     }
+    vec![push_chunk_value(0, segments)]
+}
 
-    let total = segments_prompt_char_count(segments);
-    if total <= SINGLE_PASS_CHAR_LIMIT {
-        return vec![push_chunk_value(0, segments)];
+/// Join adjacent subtitle cues that are clearly one unfinished sentence.
+pub fn join_segments_for_analysis(segments: &[SubtitleSegment]) -> Vec<SubtitleSegment> {
+    let mut joined: Vec<SubtitleSegment> = Vec::new();
+    for segment in segments {
+        if let Some(last) = joined.last_mut() {
+            if should_join_segments(last, segment) {
+                last.text = join_cue_text(&last.text, &segment.text);
+                last.end_ms = last.end_ms.max(segment.end_ms);
+                continue;
+            }
+        }
+        joined.push(segment.clone());
+    }
+    joined
+}
+
+pub(crate) fn ends_complete_sentence(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return false;
     }
 
-    chunk_segments_with_budget(segments, LARGE_CHUNK_CHAR_BUDGET)
+    let stripped = trimmed.trim_end_matches(|c: char| {
+        matches!(
+            c,
+            '"' | '\'' | '”' | '’' | '「' | '」' | '『' | '』' | ')' | '）' | ']' | '】'
+        )
+    });
+    matches!(
+        stripped.chars().last(),
+        Some('。' | '！' | '？' | '.' | '!' | '?' | '…' | '；' | ';')
+    )
+}
+
+fn should_join_segments(prev: &SubtitleSegment, next: &SubtitleSegment) -> bool {
+    if next.start_ms.saturating_sub(prev.end_ms) > JOIN_MAX_GAP_MS {
+        return false;
+    }
+    if ends_complete_sentence(&prev.text) {
+        return false;
+    }
+    prev.text.chars().count() + next.text.chars().count() <= JOIN_MAX_CHARS
+}
+
+fn join_cue_text(left: &str, right: &str) -> String {
+    let left = left.trim();
+    let right = right.trim();
+    if left.is_empty() {
+        return right.to_string();
+    }
+    if right.is_empty() {
+        return left.to_string();
+    }
+    match (left.chars().last(), right.chars().next()) {
+        (Some(a), Some(b)) if a.is_ascii_alphanumeric() && b.is_ascii_alphanumeric() => {
+            format!("{left} {right}")
+        }
+        _ => format!("{left}{right}"),
+    }
 }
 
 /// Split using an explicit character budget (segment boundaries only).
+#[allow(dead_code)]
 pub fn chunk_segments_with_budget(
+    segments: &[SubtitleSegment],
+    budget: usize,
+) -> Vec<SubtitleChunk> {
+    let unique = split_segments_with_budget(segments, budget);
+    apply_prefix_overlap(unique, overlap_budget_for(budget))
+}
+
+#[allow(dead_code)]
+fn overlap_budget_for(chunk_budget: usize) -> usize {
+    CHUNK_OVERLAP_CHAR_BUDGET.min(chunk_budget / 8)
+}
+
+#[allow(dead_code)]
+fn split_segments_with_budget(
     segments: &[SubtitleSegment],
     budget: usize,
 ) -> Vec<SubtitleChunk> {
@@ -62,6 +140,68 @@ pub fn chunk_segments_with_budget(
     chunks
 }
 
+#[allow(dead_code)]
+fn apply_prefix_overlap(unique: Vec<SubtitleChunk>, overlap_budget: usize) -> Vec<SubtitleChunk> {
+    if unique.len() <= 1 || overlap_budget == 0 {
+        return unique;
+    }
+
+    let unique_segments: Vec<Vec<SubtitleSegment>> =
+        unique.iter().map(|chunk| chunk.segments.clone()).collect();
+
+    unique
+        .into_iter()
+        .enumerate()
+        .map(|(index, chunk)| {
+            if index == 0 {
+                return chunk;
+            }
+            let prefix = overlap_suffix(&unique_segments[index - 1], overlap_budget);
+            let unique_start = chunk
+                .segments
+                .first()
+                .map(|segment| segment.start_ms)
+                .unwrap_or(0);
+            let mut segments: Vec<SubtitleSegment> = prefix
+                .into_iter()
+                .filter(|segment| segment.start_ms < unique_start)
+                .collect();
+            if segments.is_empty() {
+                return chunk;
+            }
+            segments.extend(chunk.segments);
+            push_chunk_value(chunk.index, &segments)
+        })
+        .collect()
+}
+
+#[allow(dead_code)]
+fn overlap_suffix(segments: &[SubtitleSegment], budget: usize) -> Vec<SubtitleSegment> {
+    if segments.is_empty() || budget == 0 {
+        return Vec::new();
+    }
+
+    let mut chars = 0usize;
+    let mut take = 0usize;
+    for segment in segments.iter().rev() {
+        let line_chars = prompt_line_char_count(segment);
+        if take == 0 && line_chars > budget {
+            break;
+        }
+        if take > 0 && chars + line_chars > budget {
+            break;
+        }
+        chars += line_chars;
+        take += 1;
+    }
+
+    if take == 0 {
+        return Vec::new();
+    }
+    segments[segments.len() - take..].to_vec()
+}
+
+#[allow(dead_code)]
 pub fn segments_prompt_char_count(segments: &[SubtitleSegment]) -> usize {
     segments.iter().map(prompt_line_char_count).sum()
 }
@@ -77,6 +217,7 @@ fn push_chunk_value(index: usize, segments: &[SubtitleSegment]) -> SubtitleChunk
     }
 }
 
+#[allow(dead_code)]
 fn prompt_line_char_count(segment: &SubtitleSegment) -> usize {
     format!(
         "[{}] {}\n",
@@ -147,13 +288,14 @@ mod tests {
     }
 
     #[test]
-    fn plan_chunks_splits_when_over_single_pass_limit() {
+    fn plan_chunks_keeps_long_transcript_in_one_pass() {
         let big_a = segment(1000, 2000, &"x".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
         let big_b = segment(5000, 6000, &"y".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
         let segments = [big_a.clone(), big_b.clone()];
         assert!(segments_prompt_char_count(&segments) > SINGLE_PASS_CHAR_LIMIT);
         let chunks = plan_chunks(&segments);
-        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].segments.len(), 2);
     }
 
     #[test]
@@ -171,13 +313,10 @@ mod tests {
         let big_a = segment(1000, 2000, &"x".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
         let big_b = segment(5000, 6000, &"y".repeat(LARGE_CHUNK_CHAR_BUDGET + 50));
         let chunks = plan_chunks(&[big_a, big_b]);
-        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks.len(), 1);
 
         let chunk1 = r#"{"summary":"part one","sections":[{"start_ms":1000,"end_ms":2000,"title":"A","explanation":"first"}]}"#;
-        let chunk2 = r#"{"summary":"part two","sections":[{"start_ms":5000,"end_ms":6000,"title":"B","explanation":"second"}]}"#;
-
         parse_and_validate_chunk_output(chunk1, &chunks[0], 7000).expect("chunk1");
-        parse_and_validate_chunk_output(chunk2, &chunks[1], 7000).expect("chunk2");
     }
 
     #[test]

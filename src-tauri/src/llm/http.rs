@@ -170,7 +170,6 @@ fn read_sse_response_body(
     cancelled: &mut dyn FnMut() -> bool,
 ) -> Result<()> {
     let mut parser = super::sse::SseParser::new();
-    let mut total = 0usize;
     let mut buf = [0u8; 8192];
     let mut byte_leftover = Vec::new();
     let mut saw_event = false;
@@ -185,13 +184,6 @@ fn read_sse_response_body(
             .map_err(|_| LlmError::network("LLM response read failed"))?;
         if n == 0 {
             break;
-        }
-
-        total = total.saturating_add(n);
-        if total > MAX_RESPONSE_BYTES {
-            return Err(LlmError::invalid_response(
-                "LLM response body exceeds size limit",
-            ));
         }
 
         byte_leftover.extend_from_slice(&buf[..n]);

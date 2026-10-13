@@ -12,6 +12,9 @@ pub fn chunk_system_prompt(locale: NoteLocale) -> String {
         NoteLocale::Zh => {
             "你是学习笔记助手。只能根据提供的字幕片段生成笔记，不得编造事实。\
              不要输出思维过程，不要复述或粘贴完整字幕。\
+             每段讲解必须是完整句子，禁止在句中截断。\
+             若字幕把一句话拆到多行，讲解里要把该句意思写完。\
+             分段须按时间升序覆盖本块要点，相邻小节之间不要无故跳过中间大段内容。\
              直接按以下 Markdown 结构回复，不要用代码块包裹：\n\
              ## 总结\n\n一段总述\n\n\
              ## 分段讲解\n\n\
@@ -22,6 +25,9 @@ pub fn chunk_system_prompt(locale: NoteLocale) -> String {
         NoteLocale::En => {
             "You are a study-note assistant. Use only the provided subtitle lines; do not invent facts. \
              Do not output chain-of-thought. Do not repeat or paste the full transcript. \
+             Each explanation must be complete sentences; never stop mid-clause. \
+             If a spoken sentence is split across subtitle lines, finish that thought in the note. \
+             Cover this chunk in time order; do not skip long stretches of substance between sections. \
              Reply in this Markdown structure, with no code fences:\n\
              ## Summary\n\nOverall summary\n\n\
              ## Section breakdown\n\n\
@@ -54,7 +60,7 @@ pub fn chunk_user_prompt(
                     chunk.start_ms,
                     chunk.end_ms
                 ));
-                lines.push("整场字幕（逐行，请勿改写）：".to_string());
+                lines.push("整场字幕（逐行，仅作依据）：".to_string());
             } else {
                 lines.push(format!(
                     "本块时间范围：{} - {}（毫秒 {}-{}）",
@@ -63,7 +69,11 @@ pub fn chunk_user_prompt(
                     chunk.start_ms,
                     chunk.end_ms
                 ));
-                lines.push("字幕（逐行，请勿改写）：".to_string());
+                lines.push(
+                    "相邻分块含重叠字幕，只用来补全跨块句子，不要对重叠部分重复开节。"
+                        .to_string(),
+                );
+                lines.push("字幕（逐行，仅作依据）：".to_string());
             }
         }
         NoteLocale::En => {
@@ -80,7 +90,7 @@ pub fn chunk_user_prompt(
                     chunk.start_ms,
                     chunk.end_ms
                 ));
-                lines.push("Full transcript (line by line, do not rewrite):".to_string());
+                lines.push("Full transcript (line by line, source of truth only):".to_string());
             } else {
                 lines.push(format!(
                     "Chunk range: {} - {} (ms {}-{})",
@@ -89,7 +99,11 @@ pub fn chunk_user_prompt(
                     chunk.start_ms,
                     chunk.end_ms
                 ));
-                lines.push("Subtitles (line by line, do not rewrite):".to_string());
+                lines.push(
+                    "Adjacent chunks include overlapping lines so you can finish sentences that cross the split; do not open a duplicate section for the overlap only."
+                        .to_string(),
+                );
+                lines.push("Subtitles (line by line, source of truth only):".to_string());
             }
         }
     }
@@ -239,7 +253,7 @@ mod tests {
 
         let part = chunk_user_prompt(&meta(), &chunk(), NoteLocale::En, false);
         assert!(part.contains("Chunk range"));
-        assert!(part.contains("Subtitles (line by line"));
+        assert!(part.contains("Subtitles (line by line, source of truth only)"));
         assert!(!part.contains("Full transcript"));
     }
 }
