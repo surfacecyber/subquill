@@ -1,4 +1,4 @@
-# 发布 Subquill
+# 源码分发与版本管理
 
 [English](RELEASING.md) · [文档索引](README.zh-CN.md)
 
@@ -12,20 +12,33 @@ Subquill **仅以源码分发**。不发布预编译安装包（DMG、NSIS、EXE
 - `src-tauri/Cargo.toml`
 - `src-tauri/tauri.conf.json`
 
-打标签前：
+创建源码 tag 前：
 
 ```bash
-node scripts/check-versions.mjs
+npm run check:versions
 ```
 
-推送 annotated tag 发布：
+Tag 仅作为可选源码版本引用。推送 tag 不会发布安装包，也不会触发发布工作流。
+
+GitHub 可能会为仓库 tag 提供源码归档。Subquill 不发布预编译安装包，也不提供应用内更新。针对 `main` 的 PR 和 push 会运行 `.github/workflows/ci.yml` 中的源码质量检查。
+
+## 确定性检查
+
+运行与 CI 相同的非联网检查：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+npm ci
+npm run typecheck
+npm test
+npm run build
+npm run check:versions
+cd src-tauri
+cargo fmt --check
+cargo test --locked
+cargo clippy --locked -- -D warnings
 ```
 
-GitHub 会自动为 tag 创建 release 并提供源码归档。`release` 工作流仅校验项目版本与 tag 一致，不构建或上传安装包产物。
+常规测试不会运行实时 YouTube 集成测试，因为平台可用性和反机器人检查不受项目控制。需要手动测试时，在 `src-tauri` 目录运行 `cargo test live_fetch_me_at_the_zoo -- --ignored`。
 
 ## 本地构建
 

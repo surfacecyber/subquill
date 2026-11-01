@@ -6,7 +6,8 @@ use crate::bilibili::{BilibiliSubtitleResult, SubtitleSegment};
 
 use super::error::{Result, YoutubeError};
 use super::select::{
-    parse_json3_captions, select_caption_track, tracks_from_player, with_json3_format, PlayerResponse,
+    parse_json3_captions, select_caption_track, tracks_from_player, with_json3_format,
+    PlayerResponse,
 };
 use super::url::extract_video_id;
 
@@ -88,9 +89,8 @@ pub fn fetch_subtitles(input_url: &str) -> Result<YoutubeSubtitleResult> {
         .saturating_mul(1000);
 
     let tracks = tracks_from_player(&player);
-    let track = select_caption_track(&tracks).ok_or_else(|| {
-        YoutubeError::no_subtitle("no usable YouTube caption tracks available")
-    })?;
+    let track = select_caption_track(&tracks)
+        .ok_or_else(|| YoutubeError::no_subtitle("no usable YouTube caption tracks available"))?;
 
     let caption_url = with_json3_format(&track.base_url)?;
     let body = client
@@ -236,15 +236,19 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "requires live YouTube access; run with cargo test live_fetch_me_at_the_zoo -- --ignored"]
     fn live_fetch_me_at_the_zoo() {
         let result = fetch_subtitles("https://www.youtube.com/watch?v=jNQXAC9IVRw")
             .expect("live YouTube subtitle fetch");
         assert_eq!(result.video_id, "jNQXAC9IVRw");
         assert!(!result.title.is_empty());
         assert!(!result.segments.is_empty());
-        assert!(result.segments.iter().any(|s| s.text.to_ascii_lowercase().contains("elephant")
-            || s.text.to_ascii_lowercase().contains("trunk")
-            || s.text.to_ascii_lowercase().contains("all right")));
+        assert!(result
+            .segments
+            .iter()
+            .any(|s| s.text.to_ascii_lowercase().contains("elephant")
+                || s.text.to_ascii_lowercase().contains("trunk")
+                || s.text.to_ascii_lowercase().contains("all right")));
         let pipeline = result.into_pipeline_result();
         assert_eq!(pipeline.bvid, "jNQXAC9IVRw");
         assert!(!pipeline.segments.is_empty());

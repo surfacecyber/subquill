@@ -71,11 +71,7 @@ pub struct NoteProgress {
 }
 
 impl NoteProgress {
-    pub fn new(
-        stage: NoteProgressStage,
-        chunk_index: Option<usize>,
-        chunk_count: usize,
-    ) -> Self {
+    pub fn new(stage: NoteProgressStage, chunk_index: Option<usize>, chunk_count: usize) -> Self {
         Self {
             stage,
             chunk_index,

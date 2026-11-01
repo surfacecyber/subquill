@@ -104,16 +104,9 @@ LLM output and fetched descriptions are rendered as Markdown. Treat all Markdown
 - No broad `shell`, `fs`, or `http` plugin scopes unless a feature needs them.
 - Prefer Rust-side HTTP (`reqwest` in `bilibili/` / `youtube/` / `llm/`) over giving the webview network access to third parties.
 
-### Code signing vs updater signing
+### Distribution model
 
-These are **different** concerns:
-
-| Concern | Purpose | When |
-| --- | --- | --- |
-| **OS code signing** (Apple Developer ID + notarization, Windows Authenticode) | Users can open the installer/app without Gatekeeper/SmartScreen warnings | Before public release |
-| **Tauri updater signing** (minisign key pair, public key in `tauri.conf.json`) | Verify update payloads were published by us | Before enabling auto-update |
-
-Internal beta may skip OS code signing. **Updater signing is mandatory before shipping auto-updates**, even if OS signing is deferred. Never commit private keys; use CI secrets.
+Subquill is currently distributed as source code only. Installer signing and Tauri updater signing are out of scope while pre-built installers and in-app updates are not published. If the distribution model changes, review code signing, update integrity, and key management before enabling that channel.
 
 ## Structured errors
 
@@ -257,12 +250,10 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 | Job | State machine, single-active enforcement, cancel idempotency, deadline/cancel mapping, progress payload safety, mock pipeline orchestration |
 | Integration | `tauri dev` manual; no real network in CI unit tests |
 
-## Release checklist (later)
+## Open-source maintenance checklist
 
-See also [RELEASING.md](RELEASING.md) for the shipping pipeline.
+See also [RELEASING.md](RELEASING.md) for source distribution and verification commands.
 
-- [ ] OS code signing (macOS + Windows)
-- [ ] Tauri updater key pair in CI
 - [ ] CSP review (Markdown renderer is in place; re-audit if HTML pipeline changes)
 - [ ] Secret redaction audit on logs
 - [ ] Bilibili / YouTube ToS and rate-limit review

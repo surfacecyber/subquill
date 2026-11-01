@@ -1,8 +1,13 @@
-# Auto CI disabled until packaging/release is ready.
-# Re-enable push/pull_request triggers when ready to ship.
 name: CI
 
+permissions:
+  contents: read
+
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -55,20 +60,20 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: cargo fmt
+      - name: Check formatting
         working-directory: src-tauri
         run: cargo fmt --check
 
-      - name: cargo test
+      - name: Run tests
         working-directory: src-tauri
-        run: cargo test
+        run: cargo test --locked
 
-      - name: cargo clippy
+      - name: Run clippy
         working-directory: src-tauri
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --locked -- -D warnings
 
-  release-scripts:
-    name: Release scripts
+  source-checks:
+    name: Source version checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -80,5 +85,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Test release helper scripts
+      - name: Test version checks
         run: npm test -- scripts
+
+      - name: Check project versions
+        run: npm run check:versions

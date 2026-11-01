@@ -180,7 +180,9 @@ fn is_non_speech_placeholder(text: &str) -> bool {
         return true;
     }
     let normalized = trimmed
-        .trim_matches(|c: char| c == '[' || c == ']' || c == '【' || c == '】' || c == '(' || c == ')')
+        .trim_matches(|c: char| {
+            c == '[' || c == ']' || c == '【' || c == '】' || c == '(' || c == ')'
+        })
         .trim();
     matches!(
         normalized.to_ascii_lowercase().as_str(),

@@ -104,16 +104,9 @@ LLM 输出与抓取的描述会以 Markdown 渲染。一律视为 **不可信**�
 - 除非功能明确需要，不要放开 `shell`、`fs`、`http` 等宽泛插件范围。
 - 优先在 Rust 侧发 HTTP（`bilibili/` / `youtube/` / `llm/` 中的 `reqwest`），而不是让 webview 直连第三方。
 
-### 代码签名 vs 更新器签名
+### 分发方式
 
-这是 **两类不同** 问题：
-
-| 关注点 | 目的 | 时机 |
-| --- | --- | --- |
-| **操作系统代码签名**（Apple Developer ID + 公证，Windows Authenticode） | 用户打开安装包/应用时减少 Gatekeeper/SmartScreen 警告 | 公开发布前 |
-| **Tauri 更新器签名**（minisign 密钥对，公钥写入 `tauri.conf.json`） | 验证更新包由我们发布 | 启用自动更新前 |
-
-内部测试可跳过 OS 代码签名。**启用自动更新前必须完成更新器签名**，即使 OS 签名延后。私钥不得提交仓库；使用 CI Secrets。
+当前 Subquill 仅以源码分发。在不发布预编译安装包和应用内更新的前提下，安装包签名与 Tauri 更新器签名不在本项目范围内。若将来改变分发方式，应在启用新渠道前重新评估代码签名、更新完整性和密钥管理。
 
 ## 结构化错误
 
@@ -257,12 +250,10 @@ LLM 输出与抓取的描述会以 Markdown 渲染。一律视为 **不可信**�
 | Job | 状态机、单活跃强制、取消幂等、截止/取消映射、进度载荷安全、mock 管线编排 |
 | Integration | `tauri dev` 手工；CI 单元测试不访问真实网络 |
 
-## 发布清单（后续）
+## 开源维护清单
 
-发版流水线另见 [RELEASING.zh-CN.md](RELEASING.zh-CN.md)。
+源码分发与验证命令另见 [RELEASING.zh-CN.md](RELEASING.zh-CN.md)。
 
-- [ ] OS 代码签名（macOS + Windows）
-- [ ] CI 中配置 Tauri 更新器密钥对
 - [ ] CSP 复查（Markdown 渲染器已落地；若 HTML 管线变更需再审）
 - [ ] 日志密钥脱敏审计
 - [ ] Bilibili / YouTube ToS 与速率限制评估

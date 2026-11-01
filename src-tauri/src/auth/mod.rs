@@ -112,7 +112,9 @@ pub fn resolve_bilibili_cookie(
         return Ok(Some(normalized));
     }
 
-    Ok(existing.map(|cookie| normalize_bilibili_cookie(&cookie)).filter(|c| !c.is_empty()))
+    Ok(existing
+        .map(|cookie| normalize_bilibili_cookie(&cookie))
+        .filter(|c| !c.is_empty()))
 }
 
 pub fn load_auth(paths: &StoragePaths) -> Result<Option<AuthSecrets>> {
@@ -164,9 +166,8 @@ pub fn save_auth(paths: &StoragePaths, input: SaveAuthInput) -> Result<AuthStatu
     if api_key.is_empty() && bilibili_cookie.is_none() {
         let file = paths.auth_file();
         if file.exists() {
-            std::fs::remove_file(&file).map_err(|err| {
-                Error::storage(format!("Failed to remove auth file: {err}"))
-            })?;
+            std::fs::remove_file(&file)
+                .map_err(|err| Error::storage(format!("Failed to remove auth file: {err}")))?;
         }
         return Ok(AuthStatus {
             has_api_key: false,
@@ -382,10 +383,7 @@ mod tests {
         assert!(status.has_bilibili_cookie);
         let stored = load_auth(&paths).expect("load").expect("exists");
         assert!(stored.api_key.is_empty());
-        assert_eq!(
-            stored.bilibili_cookie.as_deref(),
-            Some("SESSDATA=abc")
-        );
+        assert_eq!(stored.bilibili_cookie.as_deref(), Some("SESSDATA=abc"));
     }
 
     #[test]
@@ -403,10 +401,7 @@ mod tests {
 
     #[test]
     fn normalize_bilibili_cookie_prefixes_raw_sessdata_value() {
-        assert_eq!(
-            normalize_bilibili_cookie("abc%2Cdef"),
-            "SESSDATA=abc%2Cdef"
-        );
+        assert_eq!(normalize_bilibili_cookie("abc%2Cdef"), "SESSDATA=abc%2Cdef");
         assert_eq!(
             normalize_bilibili_cookie("SESSDATA=abc%2Cdef"),
             "SESSDATA=abc%2Cdef"

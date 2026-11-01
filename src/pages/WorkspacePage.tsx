@@ -20,7 +20,6 @@ interface WorkspacePageProps {
   locale: UiLocale;
   notesSaveDir?: string | null;
   onOpenSettings?: () => void;
-  onJobActiveChange?: (active: boolean) => void;
   /** When true (e.g. workspace tab visible), refresh cookie status for auth tips. */
   active?: boolean;
 }
@@ -115,7 +114,6 @@ export function WorkspacePage({
   locale,
   notesSaveDir = null,
   onOpenSettings,
-  onJobActiveChange,
   active = true,
 }: WorkspacePageProps) {
   const { notify } = useNotify();
@@ -186,21 +184,6 @@ export function WorkspacePage({
     : (toDisplayedNote(selectedBatchResult) ?? toDisplayedNote(result));
 
   useEffect(() => {
-    onJobActiveChange?.(isActive);
-    return () => {
-      onJobActiveChange?.(false);
-    };
-  }, [isActive, onJobActiveChange]);
-
-  useEffect(() => {
-    userPickedBatchRef.current = false;
-  }, [jobId]);
-
-  useEffect(() => {
-    if (isActive && !userPickedBatchRef.current && progress?.item_index !== undefined) {
-      setSelectedBatchIndex(progress.item_index);
-      return;
-    }
     if (!result) {
       if (!isActive) {
         setSelectedBatchIndex(null);

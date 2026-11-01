@@ -63,42 +63,48 @@ pub fn generate_note_data<T: crate::llm::HttpTransport>(
         ));
 
         let mut pump = DraftPump::new();
-        let output = analyze_chunk(
-            client,
-            &metadata,
-            chunk,
-            locale,
-            duration_ms,
-            full_pass,
-            &mut cancellation_check,
-            &mut |content, thinking| {
-                last_draft = compose_draft(
-                    &metadata,
-                    locale,
-                    &completed_drafts,
-                    chunk.index,
+        let mut on_draft = |content: &str, thinking| {
+            last_draft = compose_draft(
+                &metadata,
+                locale,
+                &completed_drafts,
+                chunk.index,
+                chunk_count,
+                content,
+            );
+            pump.emit(
+                &mut progress,
+                NoteProgressEvent {
+                    stage: NoteProgressStage::AnalyzingChunk,
+                    chunk_index: Some(chunk.index),
                     chunk_count,
-                    content,
-                );
-                pump.emit(
-                    &mut progress,
-                    NoteProgressStage::AnalyzingChunk,
-                    Some(chunk.index),
-                    chunk_count,
-                    &last_draft,
+                    draft: &last_draft,
                     thinking,
-                    false,
-                );
-            },
-        )?;
+                    force: false,
+                },
+            );
+        };
+        let output = {
+            let mut context = AnalysisContext {
+                client,
+                metadata: &metadata,
+                locale,
+                video_duration_ms: duration_ms,
+                cancellation_check: &mut cancellation_check,
+                on_draft: &mut on_draft,
+            };
+            analyze_chunk(&mut context, chunk, full_pass)?
+        };
         pump.emit(
             &mut progress,
-            NoteProgressStage::AnalyzingChunk,
-            Some(chunk.index),
-            chunk_count,
-            &last_draft,
-            false,
-            true,
+            NoteProgressEvent {
+                stage: NoteProgressStage::AnalyzingChunk,
+                chunk_index: Some(chunk.index),
+                chunk_count,
+                draft: &last_draft,
+                thinking: false,
+                force: true,
+            },
         );
         if cancellation_check() {
             return Err(NoteError::Cancelled);
@@ -153,16 +159,26 @@ struct ChunkAnalysis {
     raw_markdown: String,
 }
 
-fn analyze_chunk<T: crate::llm::HttpTransport>(
-    client: &LlmClient<T>,
-    metadata: &VideoMetadata,
-    chunk: &SubtitleChunk,
+struct AnalysisContext<'a, T: crate::llm::HttpTransport, C, D> {
+    client: &'a LlmClient<T>,
+    metadata: &'a VideoMetadata,
     locale: NoteLocale,
     video_duration_ms: u64,
+    cancellation_check: &'a mut C,
+    on_draft: &'a mut D,
+}
+
+fn analyze_chunk<T, C, D>(
+    context: &mut AnalysisContext<'_, T, C, D>,
+    chunk: &SubtitleChunk,
     full_pass: bool,
-    cancellation_check: &mut impl FnMut() -> bool,
-    on_draft: &mut impl FnMut(&str, bool),
-) -> NoteResult<ChunkAnalysis> {
+) -> NoteResult<ChunkAnalysis>
+where
+    T: crate::llm::HttpTransport,
+    C: FnMut() -> bool,
+    D: FnMut(&str, bool),
+{
+    let locale = context.locale;
     let mut work = chunk.clone();
     let mut sections: Vec<NoteSection> = Vec::new();
     let mut summaries: Vec<String> = Vec::new();
@@ -170,19 +186,10 @@ fn analyze_chunk<T: crate::llm::HttpTransport>(
     let mut from_ms = chunk.start_ms;
 
     for pass in 0..=MAX_CONTINUATIONS {
-        if cancellation_check() {
+        if (context.cancellation_check)() {
             return Err(NoteError::Cancelled);
         }
-        let once = analyze_once(
-            client,
-            metadata,
-            &work,
-            locale,
-            video_duration_ms,
-            full_pass && pass == 0,
-            cancellation_check,
-            on_draft,
-        )?;
+        let once = analyze_once(context, &work, full_pass && pass == 0)?;
         raw_parts.push(once.raw_markdown);
         if !once.parsed.summary.trim().is_empty() {
             summaries.push(once.parsed.summary);
@@ -222,36 +229,37 @@ fn analyze_chunk<T: crate::llm::HttpTransport>(
     let summary = if summaries.len() <= 1 {
         summaries.into_iter().next().unwrap_or_default()
     } else {
-        merge_summaries(client, &summaries, locale)?
+        merge_summaries(context.client, &summaries, locale)?
     };
 
     Ok(ChunkAnalysis {
-        parsed: ChunkLlmOutput {
-            summary,
-            sections,
-        },
+        parsed: ChunkLlmOutput { summary, sections },
         raw_markdown: raw_parts.join("\n\n"),
     })
 }
 
-fn analyze_once<T: crate::llm::HttpTransport>(
-    client: &LlmClient<T>,
-    metadata: &VideoMetadata,
+fn analyze_once<T, C, D>(
+    context: &mut AnalysisContext<'_, T, C, D>,
     chunk: &SubtitleChunk,
-    locale: NoteLocale,
-    video_duration_ms: u64,
     full_pass: bool,
-    cancellation_check: &mut impl FnMut() -> bool,
-    on_draft: &mut impl FnMut(&str, bool),
-) -> NoteResult<ChunkAnalysis> {
-    let messages = chunk_messages(metadata, chunk, locale, full_pass);
-    let content = client
-        .chat_stream(messages, |event| on_draft(&event.content, event.thinking), || {
-            cancellation_check()
-        })
+) -> NoteResult<ChunkAnalysis>
+where
+    T: crate::llm::HttpTransport,
+    C: FnMut() -> bool,
+    D: FnMut(&str, bool),
+{
+    let messages = chunk_messages(context.metadata, chunk, context.locale, full_pass);
+    let content = context
+        .client
+        .chat_stream(
+            messages,
+            |event| (context.on_draft)(&event.content, event.thinking),
+            || (context.cancellation_check)(),
+        )
         .map_err(map_llm_error)?;
 
-    let parsed = parse_chunk_output(&content, chunk, video_duration_ms).map_err(NoteError::Llm)?;
+    let parsed =
+        parse_chunk_output(&content, chunk, context.video_duration_ms).map_err(NoteError::Llm)?;
     Ok(ChunkAnalysis {
         parsed,
         raw_markdown: content,
@@ -354,6 +362,15 @@ struct DraftPump {
     last_thinking: bool,
 }
 
+struct NoteProgressEvent<'a> {
+    stage: NoteProgressStage,
+    chunk_index: Option<usize>,
+    chunk_count: usize,
+    draft: &'a str,
+    thinking: bool,
+    force: bool,
+}
+
 impl DraftPump {
     fn new() -> Self {
         Self {
@@ -362,23 +379,20 @@ impl DraftPump {
         }
     }
 
-    fn emit(
-        &mut self,
-        progress: &mut impl FnMut(NoteProgress),
-        stage: NoteProgressStage,
-        chunk_index: Option<usize>,
-        chunk_count: usize,
-        draft: &str,
-        thinking: bool,
-        force: bool,
-    ) {
+    fn emit(&mut self, progress: &mut impl FnMut(NoteProgress), event: NoteProgressEvent<'_>) {
+        let NoteProgressEvent {
+            stage,
+            chunk_index,
+            chunk_count,
+            draft,
+            thinking,
+            force,
+        } = event;
         let thinking_changed = thinking != self.last_thinking;
         if !force && !thinking_changed && self.last_emit.elapsed() < DRAFT_EMIT_INTERVAL {
             return;
         }
-        progress(
-            NoteProgress::new(stage, chunk_index, chunk_count).with_draft(draft, thinking),
-        );
+        progress(NoteProgress::new(stage, chunk_index, chunk_count).with_draft(draft, thinking));
         self.last_emit = Instant::now();
         self.last_thinking = thinking;
     }
@@ -455,7 +469,9 @@ mod tests {
                 if p.stage == NoteProgressStage::AnalyzingChunk {
                     analyze_count += 1;
                     assert_eq!(p.chunk_count, 1);
-                    if p.draft_markdown.as_ref().is_some_and(|md| md.contains("overall"))
+                    if p.draft_markdown
+                        .as_ref()
+                        .is_some_and(|md| md.contains("overall"))
                     {
                         saw_draft = true;
                     }
@@ -557,7 +573,10 @@ mod tests {
         let data = generate_note_data(
             &client,
             metadata(180_000),
-            vec![segment(1000, 2000, "hello"), segment(5000, 180_000, "later")],
+            vec![
+                segment(1000, 2000, "hello"),
+                segment(5000, 180_000, "later"),
+            ],
             NoteLocale::En,
             || false,
             |_| {},
@@ -581,7 +600,10 @@ mod tests {
         let err = generate_note_data(
             &client,
             metadata(180_000),
-            vec![segment(1000, 2000, "hello"), segment(5000, 180_000, "later")],
+            vec![
+                segment(1000, 2000, "hello"),
+                segment(5000, 180_000, "later"),
+            ],
             NoteLocale::En,
             || false,
             |_| {},

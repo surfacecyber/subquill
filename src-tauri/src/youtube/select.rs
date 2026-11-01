@@ -105,7 +105,7 @@ pub fn tracks_from_player(player: &PlayerResponse) -> Vec<CaptionTrack> {
 
 /// Align with BiliNote: zh-Hans > zh > zh-CN > zh-TW > en > en-US > ja,
 /// preferring manual captions over auto-generated.
-pub fn select_caption_track<'a>(tracks: &'a [CaptionTrack]) -> Option<&'a CaptionTrack> {
+pub fn select_caption_track(tracks: &[CaptionTrack]) -> Option<&CaptionTrack> {
     const LANGS: &[&str] = &["zh-Hans", "zh", "zh-CN", "zh-TW", "en", "en-US", "ja"];
 
     for &lang in LANGS {
@@ -132,9 +132,8 @@ fn lang_eq(code: &str, wanted: &str) -> bool {
 }
 
 pub fn parse_json3_captions(body: &str) -> Result<Vec<SubtitleSegment>> {
-    let parsed: Json3Caption = serde_json::from_str(body).map_err(|_| {
-        YoutubeError::subtitle_corrupt("failed to parse YouTube caption JSON")
-    })?;
+    let parsed: Json3Caption = serde_json::from_str(body)
+        .map_err(|_| YoutubeError::subtitle_corrupt("failed to parse YouTube caption JSON"))?;
 
     let mut segments = Vec::new();
     for event in parsed.events {

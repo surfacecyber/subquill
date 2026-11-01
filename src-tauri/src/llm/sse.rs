@@ -174,11 +174,14 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(events, vec![
-            r#"{"choices":[{"delta":{"content":"he"}}]}"#.to_string(),
-            r#"{"choices":[{"delta":{"content":"llo"}}]}"#.to_string(),
-            "[DONE]".to_string(),
-        ]);
+        assert_eq!(
+            events,
+            vec![
+                r#"{"choices":[{"delta":{"content":"he"}}]}"#.to_string(),
+                r#"{"choices":[{"delta":{"content":"llo"}}]}"#.to_string(),
+                "[DONE]".to_string(),
+            ]
+        );
     }
 
     #[test]

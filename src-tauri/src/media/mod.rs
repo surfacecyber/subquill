@@ -72,10 +72,7 @@ pub fn fetch_subtitles(
 }
 
 /// Lightweight metadata preview (no subtitle body download).
-pub fn preview_video(
-    input_url: &str,
-    cookie: Option<&str>,
-) -> Result<VideoPreview, ErrorPayload> {
+pub fn preview_video(input_url: &str, cookie: Option<&str>) -> Result<VideoPreview, ErrorPayload> {
     let trimmed = input_url.trim();
     if trimmed.is_empty() {
         return Err(ErrorPayload::from(crate::error::Error::validation(

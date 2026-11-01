@@ -71,14 +71,10 @@ pub async fn pick_notes_save_dir(app: tauri::AppHandle) -> CommandResult<Option<
 }
 
 #[tauri::command]
-pub fn reveal_in_folder(
-    state: tauri::State<'_, AppState>,
-    path: String,
-) -> CommandResult<()> {
+pub fn reveal_in_folder(state: tauri::State<'_, AppState>, path: String) -> CommandResult<()> {
     let canonical = prepare_reveal_path(&state.paths, &path)?;
-    reveal_path_in_folder(&canonical).map_err(|err| {
-        ErrorPayload::from(Error::storage(format!("Failed to open folder: {err}")))
-    })
+    reveal_path_in_folder(&canonical)
+        .map_err(|err| ErrorPayload::from(Error::storage(format!("Failed to open folder: {err}"))))
 }
 
 fn prepare_reveal_path(paths: &StoragePaths, path: &str) -> CommandResult<PathBuf> {
@@ -100,11 +96,9 @@ fn prepare_reveal_path(paths: &StoragePaths, path: &str) -> CommandResult<PathBu
     }
 
     let settings = load_settings(paths).map_err(ErrorPayload::from)?;
-    let notes_dir = settings.notes_save_dir.ok_or_else(|| {
-        ErrorPayload::from(Error::validation(
-            "notes_save_dir is not configured",
-        ))
-    })?;
+    let notes_dir = settings
+        .notes_save_dir
+        .ok_or_else(|| ErrorPayload::from(Error::validation("notes_save_dir is not configured")))?;
     let notes_dir = PathBuf::from(notes_dir);
     let canonical_file = path.canonicalize().map_err(|err| {
         ErrorPayload::from(Error::storage(format!("Failed to resolve path: {err}")))

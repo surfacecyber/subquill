@@ -70,8 +70,7 @@ pub fn chunk_user_prompt(
                     chunk.end_ms
                 ));
                 lines.push(
-                    "相邻分块含重叠字幕，只用来补全跨块句子，不要对重叠部分重复开节。"
-                        .to_string(),
+                    "相邻分块含重叠字幕，只用来补全跨块句子，不要对重叠部分重复开节。".to_string(),
                 );
                 lines.push("字幕（逐行，仅作依据）：".to_string());
             }

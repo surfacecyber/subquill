@@ -193,9 +193,11 @@ mod tests {
     #[test]
     fn write_markdown_uses_title_when_available() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let path = write_markdown_to_dir(dir.path(), "Demo Note", "BVTEST", "# hi")
-            .expect("write");
-        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("Demo Note.md"));
+        let path = write_markdown_to_dir(dir.path(), "Demo Note", "BVTEST", "# hi").expect("write");
+        assert_eq!(
+            path.file_name().and_then(|n| n.to_str()),
+            Some("Demo Note.md")
+        );
         assert_eq!(std::fs::read_to_string(&path).expect("read"), "# hi");
     }
 

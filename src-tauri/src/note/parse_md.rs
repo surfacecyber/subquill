@@ -123,10 +123,7 @@ fn body_after_summary(content: &str, summary: &str) -> String {
     let remainder = content.replacen(summary, "", 1);
     let mut lines = Vec::new();
     for line in remainder.lines() {
-        if is_h2(
-            line,
-            &["总结", "summary", "分段讲解", "section breakdown"],
-        ) {
+        if is_h2(line, &["总结", "summary", "分段讲解", "section breakdown"]) {
             continue;
         }
         lines.push(line);
@@ -411,7 +408,8 @@ mod tests {
 
     #[test]
     fn unstructured_prose_degrades() {
-        let output = parse_chunk_output("just some notes about the video", &chunk(), 10_000).unwrap();
+        let output =
+            parse_chunk_output("just some notes about the video", &chunk(), 10_000).unwrap();
         assert!(output.summary.contains("just some notes"));
         assert_eq!(output.sections.len(), 1);
         assert_eq!(output.sections[0].start_ms, 1000);
@@ -419,7 +417,8 @@ mod tests {
 
     #[test]
     fn clamps_out_of_range_times() {
-        let md = "## Summary\n\ns\n\n## Section breakdown\n\n### Far (00:00:00 - 00:10:00)\n\nbody\n";
+        let md =
+            "## Summary\n\ns\n\n## Section breakdown\n\n### Far (00:00:00 - 00:10:00)\n\nbody\n";
         let output = parse_chunk_output(md, &chunk(), 10_000).unwrap();
         assert_eq!(output.sections[0].start_ms, 1000);
         assert_eq!(output.sections[0].end_ms, 5000);

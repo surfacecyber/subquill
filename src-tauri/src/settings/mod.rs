@@ -170,9 +170,7 @@ pub fn validate_notes_save_dir(value: Option<String>) -> Result<Option<String>> 
 
     let path = PathBuf::from(trimmed);
     if !path.is_absolute() {
-        return Err(Error::validation(
-            "notes_save_dir must be an absolute path",
-        ));
+        return Err(Error::validation("notes_save_dir must be an absolute path"));
     }
     if !Path::new(&path).is_dir() {
         return Err(Error::validation(

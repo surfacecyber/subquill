@@ -240,7 +240,12 @@ where
     )?;
 
     if let Some(dir) = notes_save_dir.as_deref() {
-        match write_markdown_to_dir(Path::new(dir), &result.title, &result.bvid, &result.markdown) {
+        match write_markdown_to_dir(
+            Path::new(dir),
+            &result.title,
+            &result.bvid,
+            &result.markdown,
+        ) {
             Ok(path) => {
                 result.saved_path = Some(path.to_string_lossy().into_owned());
             }

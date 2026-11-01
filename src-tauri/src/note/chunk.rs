@@ -103,10 +103,7 @@ fn overlap_budget_for(chunk_budget: usize) -> usize {
 }
 
 #[allow(dead_code)]
-fn split_segments_with_budget(
-    segments: &[SubtitleSegment],
-    budget: usize,
-) -> Vec<SubtitleChunk> {
+fn split_segments_with_budget(segments: &[SubtitleSegment], budget: usize) -> Vec<SubtitleChunk> {
     if segments.is_empty() {
         return Vec::new();
     }
@@ -119,9 +116,7 @@ fn split_segments_with_budget(
     for segment in segments {
         let line_chars = prompt_line_char_count(segment);
 
-        if !current_segments.is_empty()
-            && current_chars + line_chars > budget
-            && current_chars > 0
+        if !current_segments.is_empty() && current_chars + line_chars > budget && current_chars > 0
         {
             chunks.push(push_chunk_value(chunk_index, &current_segments));
             chunk_index += 1;

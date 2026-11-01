@@ -69,7 +69,7 @@ npm run tauri build
 | --- | --- |
 | [docs/README.md](docs/README.md) | Documentation index |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Architecture, security, modules |
-| [Releasing](docs/RELEASING.md) | Versioning and source-only distribution |
+| [Source distribution](docs/RELEASING.md) | Versioning and source-only distribution |
 
 Agent guidance for AI tools: [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md).
 

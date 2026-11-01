@@ -86,9 +86,7 @@ fn titles_similar(a: &NoteSection, b: &NoteSection) -> bool {
 }
 
 fn sections_same_span_title(a: &NoteSection, b: &NoteSection) -> bool {
-    a.start_ms == b.start_ms
-        && a.end_ms == b.end_ms
-        && titles_similar(a, b)
+    a.start_ms == b.start_ms && a.end_ms == b.end_ms && titles_similar(a, b)
 }
 
 #[derive(Debug, serde::Deserialize)]

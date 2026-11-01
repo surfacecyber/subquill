@@ -361,7 +361,11 @@ impl JobManager {
             status: job.status,
             progress: job.progress.clone(),
             error: job.error.clone(),
-            batch_items: job.batch_items.iter().map(BatchItemRecord::to_view).collect(),
+            batch_items: job
+                .batch_items
+                .iter()
+                .map(BatchItemRecord::to_view)
+                .collect(),
         })
     }
 
@@ -424,11 +428,9 @@ impl JobManager {
             .batch_items
             .iter()
             .find(|item| item.index == item_index)
-            .ok_or_else(|| {
-                ErrorPayload {
-                    code: "VALIDATION_ERROR",
-                    message: format!("No batch item at index {item_index}"),
-                }
+            .ok_or_else(|| ErrorPayload {
+                code: "VALIDATION_ERROR",
+                message: format!("No batch item at index {item_index}"),
             })?;
 
         item.result.clone().ok_or_else(|| ErrorPayload {
@@ -812,16 +814,12 @@ mod tests {
         let handle = manager.try_start(urls).expect("start");
         manager.mark_running(handle.job_id).expect("running");
 
-        manager
-            .mark_item_running(handle.job_id, 0)
-            .expect("item 0");
+        manager.mark_item_running(handle.job_id, 0).expect("item 0");
         manager
             .record_item_failure(handle.job_id, 0, job_timeout())
             .expect("fail item 0");
 
-        manager
-            .mark_item_running(handle.job_id, 1)
-            .expect("item 1");
+        manager.mark_item_running(handle.job_id, 1).expect("item 1");
         manager
             .record_item_success(handle.job_id, 1, sample_result())
             .expect("ok item 1");
@@ -837,7 +835,10 @@ mod tests {
         assert_eq!(status.batch_items.len(), 2);
         assert_eq!(status.batch_items[0].status, BatchItemStatus::Failed);
         assert_eq!(status.batch_items[1].status, BatchItemStatus::Completed);
-        assert_eq!(status.batch_items[0].error_code.as_deref(), Some("JOB_TIMEOUT"));
+        assert_eq!(
+            status.batch_items[0].error_code.as_deref(),
+            Some("JOB_TIMEOUT")
+        );
     }
 
     #[test]
@@ -910,9 +911,7 @@ mod tests {
         ];
         let handle = manager.try_start(urls).expect("start");
         manager.mark_running(handle.job_id).expect("running");
-        manager
-            .mark_item_running(handle.job_id, 0)
-            .expect("item 0");
+        manager.mark_item_running(handle.job_id, 0).expect("item 0");
         manager
             .record_item_success(handle.job_id, 0, sample_result())
             .expect("ok");
@@ -954,7 +953,10 @@ mod tests {
             .expect("fail 1");
 
         manager
-            .fail(handle.job_id, internal_error("Note generation task failed unexpectedly"))
+            .fail(
+                handle.job_id,
+                internal_error("Note generation task failed unexpectedly"),
+            )
             .expect("terminal fail");
 
         let status = manager
@@ -962,7 +964,10 @@ mod tests {
             .expect("status");
         assert_eq!(status.status, JobStatus::Failed);
         assert_eq!(status.batch_items[0].status, BatchItemStatus::Completed);
-        assert_eq!(status.error.as_ref().map(|e| e.code), Some("INTERNAL_ERROR"));
+        assert_eq!(
+            status.error.as_ref().map(|e| e.code),
+            Some("INTERNAL_ERROR")
+        );
 
         // Partial success retained for preview after Failed (same as cancel).
         let result = manager

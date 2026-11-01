@@ -9,9 +9,7 @@ use super::http::{HttpRequest, HttpResponse, HttpTransport};
 use super::parse::extract_json_text;
 use super::sanitize::sanitize_api_error_message;
 use super::sse::{apply_chunk_payload, completion_message_content};
-use super::types::{
-    ChatApiErrorBody, ChatCompletionRequest, ChatMessage, ChatStreamEvent,
-};
+use super::types::{ChatApiErrorBody, ChatCompletionRequest, ChatMessage, ChatStreamEvent};
 use super::validate::{validate_llm_base_url, validate_llm_model};
 
 /// Build `<base_url>/chat/completions` without duplicating path segments such as `/v1/v1`.
@@ -211,9 +209,8 @@ fn map_http_response(response: HttpResponse, api_key: &str) -> Result<String> {
         return Err(LlmError::api(message));
     }
 
-    let content = completion_message_content(&response.body).ok_or_else(|| {
-        LlmError::invalid_response("LLM response missing message content")
-    })?;
+    let content = completion_message_content(&response.body)
+        .ok_or_else(|| LlmError::invalid_response("LLM response missing message content"))?;
 
     Ok(content)
 }
@@ -298,18 +295,14 @@ mod tests {
             r#"{"error":{"message":"bad key"}}"#,
         )
         .with_status(401)]);
-        let err = client
-            .chat(vec![ChatMessage::user("hi")])
-            .unwrap_err();
+        let err = client.chat(vec![ChatMessage::user("hi")]).unwrap_err();
         assert_eq!(err.code(), "LLM_AUTH_ERROR");
     }
 
     #[test]
     fn maps_429_to_rate_limited() {
         let client = client_with_mock(vec![MockResponse::success("").with_status(429)]);
-        let err = client
-            .chat(vec![ChatMessage::user("hi")])
-            .unwrap_err();
+        let err = client.chat(vec![ChatMessage::user("hi")]).unwrap_err();
         assert_eq!(err.code(), "LLM_RATE_LIMITED");
     }
 
@@ -319,9 +312,7 @@ mod tests {
             r#"{"error":{"message":"model not found"}}"#,
         )
         .with_status(400)]);
-        let err = client
-            .chat(vec![ChatMessage::user("hi")])
-            .unwrap_err();
+        let err = client.chat(vec![ChatMessage::user("hi")]).unwrap_err();
         assert_eq!(err.code(), "LLM_API_ERROR");
         assert_eq!(err.to_string(), "model not found");
     }
@@ -343,9 +334,7 @@ mod tests {
         )
         .expect("client");
 
-        let err = client
-            .chat(vec![ChatMessage::user("hi")])
-            .unwrap_err();
+        let err = client.chat(vec![ChatMessage::user("hi")]).unwrap_err();
         assert_eq!(err.code(), "LLM_API_ERROR");
         assert!(!err.to_string().contains(secret));
         assert!(err.to_string().contains(REDACTED));
@@ -360,9 +349,10 @@ mod tests {
 
     #[test]
     fn chat_stream_replays_buffered_json_and_sets_stream_flag() {
-        let (transport, requests_log) = crate::llm::http::mock::MockTransport::new(vec![
-            MockResponse::success(success_body("## Summary\n\nHello")),
-        ]);
+        let (transport, requests_log) =
+            crate::llm::http::mock::MockTransport::new(vec![MockResponse::success(success_body(
+                "## Summary\n\nHello",
+            ))]);
         let client = LlmClient::new(
             LlmClientConfig {
                 base_url: "https://api.openai.com/v1".to_string(),
@@ -383,7 +373,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(content, "## Summary\n\nHello");
-        assert_eq!(events.last().map(|e| e.content.as_str()), Some("## Summary\n\nHello"));
+        assert_eq!(
+            events.last().map(|e| e.content.as_str()),
+            Some("## Summary\n\nHello")
+        );
         let requests = requests_log.lock().expect("lock").clone();
         assert!(requests[0].body.contains("\"stream\":true"));
     }
@@ -400,9 +393,7 @@ mod tests {
     #[test]
     fn rejects_empty_choices() {
         let client = client_with_mock(vec![MockResponse::success(r#"{"choices":[]}"#)]);
-        let err = client
-            .chat(vec![ChatMessage::user("hi")])
-            .unwrap_err();
+        let err = client.chat(vec![ChatMessage::user("hi")]).unwrap_err();
         assert_eq!(err.code(), "LLM_INVALID_RESPONSE");
     }
 
@@ -433,9 +424,7 @@ mod tests {
         )
         .expect("client");
 
-        let err = client
-            .chat(vec![ChatMessage::user("hi")])
-            .unwrap_err();
+        let err = client.chat(vec![ChatMessage::user("hi")]).unwrap_err();
         assert_eq!(err.code(), "LLM_TIMEOUT");
 
         struct NetworkTransport;
@@ -455,9 +444,7 @@ mod tests {
         )
         .expect("client");
 
-        let err = client
-            .chat(vec![ChatMessage::user("hi")])
-            .unwrap_err();
+        let err = client.chat(vec![ChatMessage::user("hi")]).unwrap_err();
         assert_eq!(err.code(), "LLM_NETWORK_ERROR");
     }
 

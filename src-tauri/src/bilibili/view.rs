@@ -305,14 +305,12 @@ mod tests {
 
     #[test]
     fn select_page_records_actual_page_number_on_fallback() {
-        let pages = vec![
-            VideoPage {
-                cid: 10,
-                page: 2,
-                part: "Only".to_string(),
-                duration: 50,
-            },
-        ];
+        let pages = vec![VideoPage {
+            cid: 10,
+            page: 2,
+            part: "Only".to_string(),
+            duration: 50,
+        }];
         let selected = select_page(&pages, 1, 1).unwrap();
         assert_eq!(selected.cid, 10);
         assert_eq!(selected.p, 2);

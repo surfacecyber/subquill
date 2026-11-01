@@ -18,7 +18,6 @@ function App() {
   const [loadError, setLoadError] = useState(false);
   const [view, setView] = useState<AppView>("workspace");
   const [settingsDirty, setSettingsDirty] = useState(false);
-  const [, setJobActive] = useState(false);
 
   useEffect(() => {
     void getSettings()
@@ -135,7 +134,6 @@ function App() {
               locale={uiLocale}
               notesSaveDir={settings.notes_save_dir}
               onOpenSettings={() => navigate("settings")}
-              onJobActiveChange={setJobActive}
               active={view === "workspace"}
             />
           </div>

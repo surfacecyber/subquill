@@ -1,9 +1,7 @@
 use super::error::{BilibiliError, Result};
 use super::http::{HttpTransport, ReqwestTransport};
 use super::player::fetch_subtitle_tracks;
-use super::subtitle::{
-    fetch_subtitle_segments, select_subtitle_track, validate_subtitle_coverage,
-};
+use super::subtitle::{fetch_subtitle_segments, select_subtitle_track, validate_subtitle_coverage};
 use super::types::BilibiliSubtitleResult;
 use super::url::{is_short_link_host, parse_video_url, resolve_short_link};
 use super::view::fetch_view;
@@ -73,9 +71,8 @@ pub fn fetch_subtitles_with_transport(
         }
     }
 
-    Err(last_error.unwrap_or_else(|| {
-        BilibiliError::no_subtitle("failed to fetch usable subtitles")
-    }))
+    Err(last_error
+        .unwrap_or_else(|| BilibiliError::no_subtitle("failed to fetch usable subtitles")))
 }
 
 /// Lightweight metadata + subtitle-track presence (no subtitle body download).
@@ -317,7 +314,9 @@ mod tests {
             ),
             (
                 "https://subtitle.bilibili.com/demo.json",
-                MockResponse::success(r#"{"body":[{"from":0.0,"to":1.0,"content":"hi"},{"from":1.0,"to":2.0,"content":"there"},{"from":2.0,"to":3.0,"content":"friend"}]}"#),
+                MockResponse::success(
+                    r#"{"body":[{"from":0.0,"to":1.0,"content":"hi"},{"from":1.0,"to":2.0,"content":"there"},{"from":2.0,"to":3.0,"content":"friend"}]}"#,
+                ),
             ),
         ]);
 
