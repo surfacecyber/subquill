@@ -69,7 +69,6 @@ npm run tauri build
 | --- | --- |
 | [docs/README.zh-CN.md](docs/README.zh-CN.md) | 文档索引 |
 | [实现计划](docs/IMPLEMENTATION_PLAN.zh-CN.md) | 架构、安全边界、模块说明 |
-| [源码分发](docs/RELEASING.zh-CN.md) | 版本管理与源码分发 |
 
 面向 AI 工具的仓库指引见英文版 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)（未另做中文镜像）。
 
@@ -82,7 +81,7 @@ npm install
 npm run tauri build
 ```
 
-不发布 DMG、NSIS、EXE 等安装包。版本管理与贡献者检查见 [docs/RELEASING.zh-CN.md](docs/RELEASING.zh-CN.md)。
+不发布 DMG、NSIS、EXE 等安装包。
 
 ## 贡献
 

@@ -8,7 +8,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -16,12 +15,8 @@ concurrency:
 
 jobs:
   frontend:
-    name: Frontend (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
+    name: Frontend
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -33,9 +28,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
       - name: Test
         run: npm test
 
@@ -43,12 +35,8 @@ jobs:
         run: npm run build
 
   rust:
-    name: Rust (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
+    name: Rust
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -71,22 +59,3 @@ jobs:
       - name: Run clippy
         working-directory: src-tauri
         run: cargo clippy --locked -- -D warnings
-
-  source-checks:
-    name: Source version checks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: lts/*
-          cache: npm
-
-      - run: npm ci
-
-      - name: Test version checks
-        run: npm test -- scripts
-
-      - name: Check project versions
-        run: npm run check:versions

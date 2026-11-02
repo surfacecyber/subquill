@@ -69,7 +69,6 @@ npm run tauri build
 | --- | --- |
 | [docs/README.md](docs/README.md) | Documentation index |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Architecture, security, modules |
-| [Source distribution](docs/RELEASING.md) | Versioning and source-only distribution |
 
 Agent guidance for AI tools: [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md).
 
@@ -82,7 +81,7 @@ npm install
 npm run tauri build
 ```
 
-No pre-built installers (DMG, NSIS, EXE) are published. See [docs/RELEASING.md](docs/RELEASING.md) for versioning.
+No pre-built installers (DMG, NSIS, EXE) are published.
 
 ## Contributing
 

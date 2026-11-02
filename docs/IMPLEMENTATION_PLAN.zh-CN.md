@@ -252,8 +252,6 @@ LLM 输出与抓取的描述会以 Markdown 渲染。一律视为 **不可信**�
 
 ## 开源维护清单
 
-源码分发与验证命令另见 [RELEASING.zh-CN.md](RELEASING.zh-CN.md)。
-
 - [ ] CSP 复查（Markdown 渲染器已落地；若 HTML 管线变更需再审）
 - [ ] 日志密钥脱敏审计
 - [ ] Bilibili / YouTube ToS 与速率限制评估

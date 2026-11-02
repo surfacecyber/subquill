@@ -252,8 +252,6 @@ Frontend maps codes to i18n strings; never surface raw Rust backtraces.
 
 ## Open-source maintenance checklist
 
-See also [RELEASING.md](RELEASING.md) for source distribution and verification commands.
-
 - [ ] CSP review (Markdown renderer is in place; re-audit if HTML pipeline changes)
 - [ ] Secret redaction audit on logs
 - [ ] Bilibili / YouTube ToS and rate-limit review
