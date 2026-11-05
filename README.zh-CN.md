@@ -29,13 +29,13 @@ Vite 开发服务器监听 **1420** 端口。Tauri 窗口约 **960×700**。
 
 ## 功能（v0.1）
 
-- 首次引导：Base URL、模型、API Key、语言、可选 B 站 Cookie（`SESSDATA`）
+- 首次引导：Base URL、模型、API Key、语言、可选 Bilibili Cookie（`SESSDATA`）
 - 凭据仅落盘；界面只显示「已配置」占位，不回显密钥
 - 在引导页与设置中测试 LLM 连接
-- 主工作区：粘贴 B 站或 YouTube 链接、预览元数据、生成笔记、进度跟踪、取消任务
+- 主工作区：粘贴 Bilibili 或 YouTube 链接、预览元数据、生成笔记、进度跟踪、取消任务
 - 安全 Markdown 预览（不渲染原始 HTML）、复制、通过系统对话框导出 `.md`
 - 可选笔记保存目录：自动将生成的 Markdown 写入所选文件夹
-- 设置：更新配置、测试连接、清除已保存的 B 站 Cookie
+- 设置：更新配置、测试连接、清除已保存的 Bilibili Cookie
 - 关于：应用名、版本、源码仓库链接
 - 界面语言：`zh` / `en` / 跟随系统
 

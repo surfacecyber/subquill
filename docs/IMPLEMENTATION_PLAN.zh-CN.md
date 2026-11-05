@@ -60,7 +60,7 @@ subquill/
 
 - `version`
 - `api_key` — 兼容 OpenAI 的密钥
-- `bilibili_cookie` — 可选；仅当 B 站 API 需要登录时必需
+- `bilibili_cookie` — 可选；仅当 Bilibili API 需要登录时必需
 
 IPC 规则：前端通过 `get_auth_status` **只收到布尔值**（`has_api_key`、`has_bilibili_cookie`）。明文密钥永不返回。
 
@@ -76,8 +76,8 @@ IPC 规则：前端通过 `get_auth_status` **只收到布尔值**（`has_api_ke
 
 ### Cookie / 凭据边界
 
-- B 站 Cookie 保存在 `auth.json`，加载后仅留在 Rust 内存。
-- 只有 Rust 调用 B 站 HTTP API。
+- Bilibili Cookie 保存在 `auth.json`，加载后仅留在 Rust 内存。
+- 只有 Rust 调用 Bilibili HTTP API。
 - Cookie **仅**发送到 `https://api.bilibili.com` 的 view/player 接口 — 不发往 `b23.tv` 短链跳转或字幕 CDN。
 - 前端可在引导时收集一次 Cookie；保存后 UI 仅显示占位。
 - 不要在日志中打印 Cookie 或 API Key。
@@ -130,7 +130,7 @@ LLM 输出与抓取的描述会以 Markdown 渲染。一律视为 **不可信**�
 | `API_REJECTED` | 平台 API 返回拒绝 / 非零结果 |
 | `PART_OUT_OF_RANGE` | 请求的 `p` 超出分 P 数量 |
 | `AUTH_REQUIRED` | 可能需要登录 Cookie（例如缺少 `subtitle_url`） |
-| `RATE_LIMITED` | B 站返回 HTTP 412 / 429 |
+| `RATE_LIMITED` | Bilibili 返回 HTTP 412 / 429 |
 | `NO_SUBTITLE` | 无可用字幕轨道 |
 | `SUBTITLE_CORRUPT` | 字幕 JSON 无效或解析后为空 |
 | `LLM_AUTH_ERROR` | LLM API 拒绝凭据 |
@@ -172,7 +172,7 @@ LLM 输出与抓取的描述会以 Markdown 渲染。一律视为 **不可信**�
 - 根据 URL 主机/形态区分 YouTube 与 Bilibili。
 - `preview_video` 与 `fetch_subtitles` 共用入口；Cookie 只传入 Bilibili 路径。
 - YouTube 结果适配为笔记管线已使用的字幕/预览结构。
-- 工作区 UI 调用 `preview_video` / 启动任务；遗留的 `fetch_bilibili_subtitles` 仍作为仅 B 站拉取的薄命令保留。
+- 工作区 UI 调用 `preview_video` / 启动任务；遗留的 `fetch_bilibili_subtitles` 仍作为仅 Bilibili 拉取的薄命令保留。
 
 ## Bilibili 集成（`bilibili/`）
 
@@ -180,7 +180,7 @@ LLM 输出与抓取的描述会以 Markdown 渲染。一律视为 **不可信**�
 
 - 在 Rust（`url.rs`）中解析 BV/av URL 与 `p` 分 P。
 - 手动解析 `b23.tv` 短链，并做主机白名单校验。
-- **标题来源**：B 站 **view API**（`x/web-interface/view`）。
+- **标题来源**：Bilibili **view API**（`x/web-interface/view`）。
 - 字幕：`x/player/wbi/v2`（`bvid`+`cid`，与 BiliNote 一致）→ 选轨（人工中文 > AI 中文 > 任意中文 > 首个有效）→ 从白名单 CDN 下载 JSON。**不要**用带 `aid` 的 `/x/player/v2` — 可能返回空或错误视频的 `subtitle_url`。
 - Cookie 仅用于 `api.bilibili.com` 请求。
 - 读取前限制响应体：API/跳转约 2 MiB / 64 KiB，字幕 CDN 至多 16 MiB；超限失败且不回显响应内容。

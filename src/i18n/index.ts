@@ -16,9 +16,9 @@ const messages = {
     model: "模型",
     apiKey: "API Key",
     apiKeySaved: "已配置",
-    bilibiliCookie: "B 站 Cookie（可选，只需 SESSDATA）",
+    bilibiliCookie: "Bilibili Cookie（可选，只需 SESSDATA）",
     bilibiliCookieHint:
-      "用于拉取 B 站 AI/需登录字幕；YouTube 不需要。在浏览器打开 bilibili.com → F12 → Application/应用 → Cookies → bilibili.com，复制名为 SESSDATA 的值。可只贴值，也可贴 SESSDATA=值。其余 Cookie 不用复制。",
+      "用于拉取 Bilibili AI/需登录字幕；YouTube 不需要。在浏览器打开 bilibili.com → F12 → Application/应用 → Cookies → bilibili.com，复制名为 SESSDATA 的值。可只贴值，也可贴 SESSDATA=值。其余 Cookie 不用复制。",
     bilibiliCookiePlaceholder: "SESSDATA=… 或直接粘贴值",
     bilibiliCookieSaved: "已配置",
     locale: "界面语言",
@@ -40,7 +40,7 @@ const messages = {
     clearApiKeyConfirm:
       "清除已保存的 API Key？清除后需重新填写才能生成笔记。",
     clearCookie: "清除 Cookie",
-    clearCookieConfirm: "清除已保存的 B 站 Cookie？部分视频之后可能无法拉取字幕。",
+    clearCookieConfirm: "清除已保存的 Bilibili Cookie？部分视频之后可能无法拉取字幕。",
     cookieCleared: "Cookie 已清除",
     bilibiliCookieHowTo: "如何获取 SESSDATA？",
     notesSaveDir: "笔记保存位置",
@@ -58,8 +58,8 @@ const messages = {
     invalidVideoUrls:
       "请粘贴至少一条合法的视频链接（每行一条，需以 http:// 或 https:// 开头）。",
     workspaceEmptyHint:
-      "粘贴 B 站或 YouTube 链接即可生成学习笔记。视频需有在线字幕（含 AI 字幕）；长视频可能需要几分钟。",
-    workspaceEmptyCookieHint: "部分 B 站视频需配置 SESSDATA Cookie 才能拉取字幕。",
+      "粘贴 Bilibili 或 YouTube 链接即可生成学习笔记。视频需有在线字幕（含 AI 字幕）；长视频可能需要几分钟。",
+    workspaceEmptyCookieHint: "部分 Bilibili 视频需配置 SESSDATA Cookie 才能拉取字幕。",
     openSettings: "打开设置",
     retryGenerate: "重试",
     generate: "生成笔记",
@@ -76,8 +76,8 @@ const messages = {
     videoPreviewSubtitlesYes: "检测到字幕轨道",
     videoPreviewSubtitlesNo: "未检测到字幕轨道",
     videoPreviewAuthRequired:
-      "可能需要配置 B 站 Cookie（SESSDATA）才能拉取字幕",
-    videoPreviewAuthStale: "B 站 Cookie 已失效，请到设置中更新 SESSDATA",
+      "可能需要配置 Bilibili Cookie（SESSDATA）才能拉取字幕",
+    videoPreviewAuthStale: "Bilibili Cookie 已失效，请到设置中更新 SESSDATA",
     saveDirGuide:
       "生成成功。可在设置中配置笔记保存位置，之后将自动保存为 Markdown。未配置时请及时另存或复制，关闭或开始新任务后结果会丢失。",
     saveDirGuideBatch:
@@ -103,12 +103,12 @@ const messages = {
     loading: "加载中…",
     loadSettingsFailed: "无法加载设置。",
     aboutTitle: "关于 Subquill",
-    aboutDescription: "从 B 站 / YouTube 视频字幕生成学习笔记的桌面应用。",
+    aboutDescription: "从 Bilibili / YouTube 视频字幕生成学习笔记的桌面应用。",
     aboutPlatformsTitle: "支持平台",
     aboutPlatforms: "Bilibili、YouTube（公开字幕）。",
     aboutPrivacyTitle: "隐私",
     aboutPrivacy:
-      "API Key 与 B 站 Cookie 仅保存在本机，不会上传到 Subquill 服务器。Cookie 仅用于请求 B 站官方 API。",
+      "API Key 与 Bilibili Cookie 仅保存在本机，不会上传到 Subquill 服务器。Cookie 仅用于请求 Bilibili 官方 API。",
     aboutCookieTitle: "Cookie 用途",
     aboutCookie:
       "可选的 SESSDATA 用于拉取需登录或 AI 字幕；YouTube 无需 Cookie。",
@@ -152,12 +152,12 @@ const messages = {
     error_NO_SUBTITLE:
       "该视频暂无可用的在线字幕（含 AI 字幕）。通常与 Cookie 无关；可换有字幕的视频，或稍后再试。",
     error_SUBTITLE_CORRUPT:
-      "拉取到的字幕与视频时长明显不匹配（可能是 B 站 AI 字幕串台或未生成完整）。请稍后重试，或换有人工字幕的视频。",
+      "拉取到的字幕与视频时长明显不匹配（可能是 Bilibili AI 字幕错配或未生成完整）。请稍后重试，或换有人工字幕的视频。",
     error_VIDEO_NOT_FOUND: "未找到该视频。",
     error_VIDEO_RESTRICTED:
       "该 YouTube 视频需要登录，或受年龄/地区限制。多数公开视频无需登录；Subquill 不支持登录 YouTube。",
-    error_AUTH_REQUIRED: "需要配置 B 站 SESSDATA Cookie 才能获取字幕。",
-    error_RATE_LIMITED: "B 站请求过于频繁，请稍后再试。",
+    error_AUTH_REQUIRED: "需要配置 Bilibili SESSDATA Cookie 才能获取字幕。",
+    error_RATE_LIMITED: "Bilibili 请求过于频繁，请稍后再试。",
     error_PART_OUT_OF_RANGE: "分 P 编号超出视频页数。",
     error_SHORT_LINK_FAILED: "短链接解析失败，请改用完整视频链接。",
     error_API_REJECTED: "视频平台拒绝了请求，请稍后重试或检查链接。",
